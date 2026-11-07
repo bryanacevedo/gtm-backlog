@@ -1,0 +1,390 @@
+<title>gtm-backlog Identity v2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Review sheet. Three identities over one interactive Triage inbox.
+   Rules applied from research: no side-stripe selection, no pills for metadata,
+   no uppercase eyebrows, surfaces only where they mean something, motion only on state change. */
+:root{
+  --sheet:#ECECEA; --sheet-ink:#1C1C1F; --sheet-mute:#6A6A72; --sheet-line:#D9D9D5;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sheet:#161618;--sheet-ink:#EDEDEF;--sheet-mute:#9A9AA2;--sheet-line:#2C2C30;color-scheme:dark}}
+:root[data-theme="dark"]{--sheet:#161618;--sheet-ink:#EDEDEF;--sheet-mute:#9A9AA2;--sheet-line:#2C2C30;color-scheme:dark}
+body{background:var(--sheet);color:var(--sheet-ink);font-family:var(--ui);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:18px}
+.intro h1{font-size:21px;margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance}
+.intro p{margin:0;color:var(--sheet-mute);max-width:74ch;line-height:1.5;font-size:14px}
+.picker{display:flex;gap:8px;flex-wrap:wrap}
+.picker button{font:500 13px/1 var(--ui);height:34px;padding:0 14px;border-radius:8px;border:1px solid var(--sheet-line);background:transparent;color:var(--sheet-ink);cursor:pointer}
+.picker button[aria-pressed="true"]{background:var(--sheet-ink);color:var(--sheet);border-color:var(--sheet-ink)}
+.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 24px;font-size:13px;line-height:1.5;color:var(--sheet-mute);margin:0;padding:0;list-style:none}
+.why b{color:var(--sheet-ink);font-weight:600}
+.frame{overflow-x:auto;border-radius:12px;border:1px solid var(--sheet-line);min-width:0}
+.note{font-size:12.5px;color:var(--sheet-mute);line-height:1.5;margin:0}
+
+/* ============================== product ============================== */
+.app{
+  --font:"Geist",var(--ui); --mono:"Geist Mono",ui-monospace,monospace;
+  --bg:#FAFAFA; --panel:#FFFFFF; --rail:#F4F4F5; --ink:#09090B; --ink2:#52525B; --ink3:#8B8B93; --ink4:#C4C4CA;
+  --line:rgba(9,9,11,.08); --line2:rgba(9,9,11,.14); --accent:#18181B; --accent-hover:#3F3F46; --accent-ink:#FFFFFF;
+  --link:#18181B; --sel:rgba(9,9,11,.045); --hover:rgba(9,9,11,.03); --radius:8px; --tight:-0.011em;
+  --ease:cubic-bezier(.2,0,0,1);
+  position:relative;display:grid;grid-template-columns:208px 340px minmax(460px,1fr);min-width:1008px;height:660px;overflow:hidden;
+  font-family:var(--font);color:var(--ink);background:var(--bg);font-size:13px;letter-spacing:var(--tight);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums
+}
+.app[data-dir="B"]{
+  --font:"IBM Plex Sans",var(--ui); --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --bg:#F7F5F0; --panel:#FFFEFB; --rail:#EFECE4; --ink:#1A1915; --ink2:#55524A; --ink3:#8C887D; --ink4:#C2BEB3;
+  --line:rgba(26,25,21,.09); --line2:rgba(26,25,21,.16); --accent:#2B2924; --accent-hover:#45423A; --accent-ink:#FBFAF6;
+  --link:#2B2924; --sel:rgba(26,25,21,.06); --hover:rgba(26,25,21,.035); --radius:4px; --tight:0;
+}
+.app[data-dir="C"]{
+  --font:"Instrument Sans",var(--ui); --mono:"Geist Mono",ui-monospace,monospace;
+  --bg:#F3F4F2; --panel:#FFFFFF; --rail:#151816; --ink:#121513; --ink2:#4B524D; --ink3:#848B86; --ink4:#BCC2BE;
+  --line:rgba(18,21,19,.08); --line2:rgba(18,21,19,.15); --accent:#E5481F; --accent-hover:#CC3D17; --accent-ink:#FFFFFF;
+  --link:#C23C17; --sel:rgba(18,21,19,.05); --hover:rgba(18,21,19,.03); --radius:10px; --tight:-0.006em;
+}
+.app *{box-sizing:border-box}
+:where(.app) :where(button){font:inherit;color:inherit;letter-spacing:inherit;background:none;border:0;padding:0;cursor:pointer}
+.app :focus-visible{outline:2px solid var(--link);outline-offset:2px;border-radius:4px}
+
+/* rail */
+.rail{background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px 10px;gap:1px;min-width:0}
+.ws{display:flex;align-items:center;gap:9px;padding:6px 8px 14px;font-weight:600;font-size:13.5px}
+.ws-mark{width:20px;height:20px;border-radius:6px;background:var(--ink);display:grid;place-items:center}
+.ws-mark i{width:10px;height:2px;border-radius:1px;background:var(--panel);box-shadow:0 -4px 0 var(--panel),0 4px 0 var(--panel);display:block}
+.search{display:flex;align-items:center;gap:8px;height:30px;padding:0 9px;border-radius:calc(var(--radius) - 2px);box-shadow:inset 0 0 0 1px var(--line);background:var(--panel);color:var(--ink3);margin-bottom:10px;font-size:12.5px}
+.search kbd{margin-left:auto}
+.nav{display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;border-radius:calc(var(--radius) - 2px);color:var(--ink2);font-weight:500;transition:background-color .15s ease,color .15s ease}
+.nav:hover{background:var(--hover)}
+.nav svg{width:15px;height:15px;color:var(--ink3);flex:none}
+.nav .n{margin-left:auto;font:400 11.5px/1 var(--mono);color:var(--ink3)}
+.nav.on{background:var(--sel);color:var(--ink)}
+.nav.on svg{color:var(--ink)}
+.grp{font-size:12px;color:var(--ink3);padding:16px 8px 6px}
+.team{display:flex;align-items:center;gap:10px;height:28px;padding:0 8px;color:var(--ink2)}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}
+.me{margin-top:auto;display:flex;align-items:center;gap:9px;padding:10px 8px 2px;border-top:1px solid var(--line);color:var(--ink2)}
+.app[data-dir="C"] .rail{color:#C9CEC9;border-right-color:#000}
+.app[data-dir="C"] .ws{color:#F3F4F2}
+.app[data-dir="C"] .ws-mark{background:var(--accent)}
+.app[data-dir="C"] .ws-mark i{background:#fff;box-shadow:0 -4px 0 #fff,0 4px 0 #fff}
+.app[data-dir="C"] .search{background:#1F2420;box-shadow:inset 0 0 0 1px #2A302B;color:#8A918B}
+.app[data-dir="C"] .nav{color:#A9B0AA}
+.app[data-dir="C"] .nav:hover{background:#1D221E}
+.app[data-dir="C"] .nav svg{color:#6F7770}
+.app[data-dir="C"] .nav.on{background:#252B26;color:#FFFFFF}
+.app[data-dir="C"] .nav.on svg{color:#fff}
+.app[data-dir="C"] .grp,.app[data-dir="C"] .nav .n{color:#6F7770}
+.app[data-dir="C"] .team{color:#A9B0AA}
+.app[data-dir="C"] .me{border-top-color:#252B26;color:#A9B0AA}
+.app[data-dir="C"] .rail kbd{background:#252B26;box-shadow:none;color:#A9B0AA}
+
+/* list */
+.list{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-width:0}
+.list-head{display:flex;align-items:baseline;gap:8px;height:48px;padding:15px 16px 0;border-bottom:1px solid var(--line)}
+.list-head h2{font-size:14px;font-weight:600;margin:0}
+.list-head .n{font:400 12px/1 var(--mono);color:var(--ink3)}
+.list-head .filter{margin-left:auto;font-size:12.5px;color:var(--ink3)}
+.reqs{position:relative;flex:1;overflow:hidden}
+.req{width:100%;text-align:left;display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:3px 10px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--line);
+  transition:background-color .15s ease,opacity .2s var(--ease),transform .2s var(--ease);position:relative}
+.req:hover{background:var(--hover)}
+.req[aria-selected="true"]{background:var(--sel)}
+.req .av{grid-row:1/3;align-self:start;margin-top:1px}
+.req .t{font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req .meta{grid-column:2/4;display:flex;align-items:center;gap:6px;color:var(--ink3);font-size:12px;min-width:0}
+.req .age{font:400 11.5px/1 var(--mono);color:var(--ink3)}
+.req .new{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;margin-left:2px;transition:transform .2s var(--ease),opacity .2s ease}
+.req.leaving{opacity:0;transform:translateX(-12px)}
+.list-empty{padding:28px 16px;color:var(--ink3);line-height:1.5}
+.list-foot{padding:10px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--ink3);display:flex;gap:6px;align-items:center}
+
+/* detail */
+.detail{background:var(--bg);display:flex;flex-direction:column;min-width:0}
+.d-head{display:flex;align-items:center;gap:8px;height:48px;padding:0 24px;border-bottom:1px solid var(--line);color:var(--ink3);font-size:12.5px}
+.d-head .sp{margin-left:auto;display:flex;gap:4px}
+.icon-btn{width:28px;height:28px;border-radius:calc(var(--radius) - 2px);display:grid;place-items:center;color:var(--ink3);transition:background-color .15s ease,color .15s ease}
+.icon-btn:hover{background:var(--hover);color:var(--ink)}
+.icon-btn svg{width:14px;height:14px}
+.d-body{padding:22px 24px 0;display:grid;gap:14px;align-content:start;flex:1;min-height:0}
+.swap{animation:swapIn .18s var(--ease)}
+@keyframes swapIn{from{opacity:0;transform:translateY(4px)}}
+.who{display:flex;align-items:center;gap:9px;color:var(--ink3)}
+.who b{color:var(--ink2);font-weight:500}
+.d-body h3{font-size:20px;line-height:1.25;font-weight:600;letter-spacing:-0.018em;margin:0;text-wrap:balance}
+.app[data-dir="B"] .d-body h3{letter-spacing:-0.005em}
+.problem{margin:0;font-size:14px;line-height:1.6;color:var(--ink2);max-width:60ch}
+.facts{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--ink3);font-size:12.5px}
+.facts span{display:inline-flex;align-items:center;gap:6px}
+.facts svg{width:13px;height:13px}
+.facts a{color:var(--ink2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line2)}
+.facts a:hover{text-decoration:underline;text-underline-offset:2px}
+
+.decide{margin-top:8px;background:var(--panel);border-radius:calc(var(--radius) + 2px);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.04);display:grid;grid-template-columns:minmax(0,1fr) 230px}
+.inputs{padding:16px 18px;display:grid;gap:14px;border-right:1px solid var(--line)}
+.in-row{display:grid;grid-template-columns:84px minmax(0,1fr) 58px;align-items:center;gap:14px}
+.in-row .lab{color:var(--ink2)}
+.in-row .val{font:500 13px/1 var(--mono);text-align:right;color:var(--ink)}
+.steps{display:flex;gap:3px;height:24px;align-items:center}
+.steps button{flex:1;height:24px;display:grid;align-items:center}
+.steps button i{display:block;height:6px;border-radius:2px;background:var(--line2);transition:background-color .15s ease,transform .15s var(--ease)}
+.steps button.f i{background:var(--ink)}
+.steps button:hover i{transform:scaleY(1.5)}
+.range{appearance:none;-webkit-appearance:none;width:100%;height:24px;background:transparent;cursor:pointer;margin:0}
+.range::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:linear-gradient(var(--ink),var(--ink)) 0/var(--p,40%) 100% no-repeat,var(--line2)}
+.range::-moz-range-track{height:2px;border-radius:1px;background:var(--line2)}
+.range::-moz-range-progress{height:2px;background:var(--ink)}
+.range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border-radius:50%;background:var(--panel);box-shadow:0 0 0 1.5px var(--ink),0 1px 3px rgba(0,0,0,.15);transition:transform .15s var(--ease)}
+.range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--panel);border:1.5px solid var(--ink)}
+.range:active::-webkit-slider-thumb{transform:scale(1.15)}
+.rank{padding:16px 18px;display:grid;gap:8px;align-content:start}
+.rank .lab{font-size:12.5px;color:var(--ink3)}
+.rank .big{display:flex;align-items:baseline;gap:8px}
+.rank .big b{font:500 30px/1 var(--mono);letter-spacing:-0.03em;display:inline-block}
+.rank .big b.tick{animation:tick .22s var(--ease)}
+@keyframes tick{from{opacity:.3;transform:translateY(-5px)}}
+.rank .big span{color:var(--ink3)}
+.mini{position:relative;height:150px;margin-top:4px}
+.mini div{position:absolute;left:0;right:0;height:28px;display:grid;grid-template-columns:18px minmax(0,1fr) 30px;gap:8px;font-size:12px;color:var(--ink3);align-items:center;
+  border-top:1px solid var(--line);transition:transform .28s var(--ease),background-color .2s ease,color .2s ease}
+.mini div span:first-child,.mini div span:last-child{font-family:var(--mono);font-size:11.5px}
+.mini div span:last-child{text-align:right}
+.mini div span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini .mine{color:var(--ink);font-weight:500;background:var(--sel);border-top-color:transparent;border-radius:calc(var(--radius) - 3px);padding:0 6px;margin:0 -6px;z-index:1}
+
+.actions{display:flex;gap:8px;align-items:center;padding:14px 24px 16px;border-top:1px solid var(--line);background:var(--bg)}
+.b{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:calc(var(--radius) - 2px);font-weight:500;box-shadow:inset 0 0 0 1px var(--line2);background:var(--panel);color:var(--ink);
+  transition:background-color .15s ease,box-shadow .15s ease,transform .1s ease}
+.b:hover{box-shadow:inset 0 0 0 1px var(--ink4)}
+.b:active{transform:scale(.98)}
+.b.pri{background:var(--accent);box-shadow:none;color:var(--accent-ink)}
+.b.pri:hover{background:var(--accent-hover)}
+.b.pri kbd{background:rgba(255,255,255,.14);box-shadow:none;color:inherit}
+.b.ghost{box-shadow:none;background:transparent;color:var(--ink2)}
+.b.ghost:hover{background:var(--hover)}
+.actions .hint{margin-left:auto;color:var(--ink3);font-size:12.5px}
+kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--line2);background:var(--panel);color:var(--ink3);font:500 10.5px/1 var(--mono)}
+
+.toast{position:absolute;left:50%;bottom:18px;transform:translate(-50%,12px);opacity:0;display:flex;align-items:center;gap:14px;height:38px;padding:0 6px 0 14px;border-radius:calc(var(--radius) + 2px);
+  background:#18181B;color:#FAFAFA;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,.18);transition:opacity .2s ease,transform .25s var(--ease);pointer-events:none;z-index:5}
+.toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast button{height:28px;padding:0 10px;border-radius:6px;color:#FAFAFA;font-weight:500;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.35)}
+.toast button:hover{background:rgba(255,255,255,.08)}
+
+.av{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:600 10px/1 var(--font);color:#fff;flex:none;letter-spacing:0}
+.av.sm{width:20px;height:20px;font-size:9px}
+.app[data-dir="B"] .av{border-radius:4px}
+
+@media (prefers-reduced-motion: reduce){.app *,.app *::before{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <h1>Triage as an inbox. Pick the identity.</h1>
+    <p>This one is interactive. Click a request, set the inputs and watch where it lands in the queue, then press Accept. Same structure in all three; only type, color and surface change. Built to the rules from the research: no colored edge bars, no pills, no uppercase labels, and motion only when something changes.</p>
+  </div>
+  <div class="picker" role="group" aria-label="Identity">
+    <button type="button" data-pick="A" aria-pressed="true">A · Studio</button>
+    <button type="button" data-pick="B" aria-pressed="false">B · Ledger</button>
+    <button type="button" data-pick="C" aria-pressed="false">C · Signal</button>
+  </div>
+  <ul class="why" id="why"></ul>
+  <div class="frame"><div class="app" id="app" data-dir="A"></div></div>
+  <p class="note">On a phone, the mock scrolls sideways inside its frame; the real app gets its own phone layout. Fonts are all free: Geist (Vercel's family), IBM Plex, Instrument Sans. The research flags Geist as a font AI tools now default to, which is the honest risk with A.</p>
+</div>
+
+<script>
+const WHY = {
+  A: ["<b>Feels like:</b> Vercel, Linear. Neutral zinc greys, black as the action color.", "<b>Strong at:</b> reading as a serious engineering product. Color comes only from people and teams.", "<b>Risk:</b> the most restrained, and Geist is becoming a default font."],
+  B: ["<b>Feels like:</b> a well-made finance tool. Warm paper, IBM Plex, warm graphite as the action color.", "<b>Strong at:</b> trust and legibility for revenue leaders. Square avatars and tight corners.", "<b>Risk:</b> slightly more traditional; less startup."],
+  C: ["<b>Feels like:</b> Raycast, Height. A dark rail, a bright work area, signal-orange actions.", "<b>Strong at:</b> the most distinctive. You remember it after one look.", "<b>Risk:</b> the orange has to stay rare, or it gets loud."],
+};
+const I = {
+  inbox: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2 9.5 3.6 3.2a1 1 0 0 1 1-.7h6.8a1 1 0 0 1 1 .7L14 9.5V13a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 2 13V9.5Z"/><path d="M2 9.5h3.2l.8 1.6h4l.8-1.6H14"/></svg>',
+  list: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.6" cy="4" r=".6" fill="currentColor"/><circle cx="2.6" cy="8" r=".6" fill="currentColor"/><circle cx="2.6" cy="12" r=".6" fill="currentColor"/></svg>',
+  board: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="3.4" height="11" rx="1"/><rect x="6.3" y="2.5" width="3.4" height="7" rx="1"/><rect x="10.6" y="2.5" width="3.4" height="9" rx="1"/></svg>',
+  ship: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v8M4.8 5.7 8 2.5l3.2 3.2"/><path d="M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/></svg>',
+  search: '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.3"/><path d="m10.3 10.3 3 3"/></svg>',
+  link: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 9a2.5 2.5 0 0 0 3.5 0l2-2A2.5 2.5 0 0 0 9 3.5l-.6.6M9 7a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 7 12.5l.6-.6"/></svg>',
+  bolt: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8.8 1.8 3.5 9h4l-.8 5.2L12.5 7h-4Z"/></svg>',
+  up: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10 4-4 4 4"/></svg>',
+  down: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>',
+};
+const TEAM = { "Field Marketing": "#D97706", "Sales": "#2563EB", "Marketing": "#DB2777", "SDR": "#0E7490", "RevOps": "#0D9488" };
+const PEOPLE = { "Priya Raman": "#C2410C", "Chris Nolan": "#1D4ED8", "Hannah Cole": "#BE185D", "Sam Ortiz": "#3F3F46" };
+const av = (n, sm) => `<span class="av${sm ? " sm" : ""}" style="background:${PEOPLE[n]}" aria-hidden="true">${n.split(" ").map((p) => p[0]).join("")}</span>`;
+const QUEUE = [["Intent digest to Slack", 96], ["CRM duplicate merge job", 56], ["Webinar no-show follow-up", 32], ["Partner request intake", 30], ["Inbound lead response under 5 min", 28], ["Meeting no-show rebooking", 27]];
+let reqs = [
+  { id: 114, t: "Sync event leads to the CRM same day", who: "Priya Raman", team: "Field Marketing", age: "1d", when: "yesterday", fresh: true, p: "Badge scans reach the CRM a week after the event. By then the conversation is cold. Can they land the same day?", touches: "Speed, data quality", src: "Slack thread", s: { impact: 4, reach: 60, conf: 2, effort: 6 } },
+  { id: 113, t: "Slack alert when a target account visits pricing", who: "Chris Nolan", team: "Sales", age: "2d", when: "2 days ago", fresh: true, p: "We only find out a target account was on the pricing page if someone opens the analytics tool, which nobody does on a busy day.", touches: "Pipeline, speed", src: "Pricing page analytics", s: { impact: 4, reach: 25, conf: 2, effort: 3 } },
+  { id: 112, t: "Clean job titles for segmentation", who: "Hannah Cole", team: "Marketing", age: "3d", when: "3 days ago", fresh: false, p: "Job titles come in 400 spellings, so persona campaigns miss most of the list and reps hand-filter exports.", touches: "Data quality", src: "Segment export", s: { impact: 3, reach: 300, conf: 2, effort: 4 } },
+];
+let sel = 0, dir = "A", toastTimer = 0, last = null;
+const confPct = [50, 80, 100];
+const score = (s) => (s.impact * s.reach * (confPct[s.conf - 1] / 100)) / s.effort;
+
+function shell() {
+  const app = document.getElementById("app");
+  app.dataset.dir = dir;
+  app.innerHTML = `
+  <nav class="rail" aria-label="Views">
+    <div class="ws"><span class="ws-mark"><i></i></span>Acme GTM</div>
+    <div class="search">${I.search}<span>Search</span><kbd>/</kbd></div>
+    <button class="nav on" type="button">${I.inbox}Triage<span class="n" id="cnt">${reqs.length}</span></button>
+    <button class="nav" type="button">${I.list}Queue<span class="n">13</span></button>
+    <button class="nav" type="button">${I.board}Board<span class="n">18</span></button>
+    <button class="nav" type="button">${I.ship}Shipped<span class="n">6</span></button>
+    <div class="grp">Teams</div>
+    ${Object.keys(TEAM).map((t) => `<div class="team"><span class="dot" style="background:${TEAM[t]}"></span>${t}</div>`).join("")}
+    <div class="me">${av("Sam Ortiz", true)}<span>Sam Ortiz</span></div>
+  </nav>
+  <section class="list" aria-label="Requests">
+    <div class="list-head"><h2>Triage</h2><span class="n" id="cnt2">${reqs.length}</span><span class="filter">Oldest first</span></div>
+    <div class="reqs" id="reqs" role="listbox" aria-label="Waiting requests"></div>
+    <div class="list-foot"><kbd>J</kbd><kbd>K</kbd> to move, <kbd>A</kbd> to accept</div>
+  </section>
+  <section class="detail" aria-label="Decision" id="detail"></section>
+  <div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-text"></span><button type="button" id="undo">Undo</button></div>`;
+  document.getElementById("undo").onclick = undo;
+  list(); detail(true);
+}
+
+function list() {
+  const el = document.getElementById("reqs");
+  el.innerHTML = reqs.length ? reqs.map((r, i) => `
+    <button type="button" class="req" role="option" aria-selected="${i === sel}" data-i="${i}">
+      ${av(r.who)}
+      <span class="t">${r.t}</span><span class="age">${r.age}${r.fresh ? ' <span class="new" aria-label="new"></span>' : ""}</span>
+      <span class="meta">${r.who} · <span class="dot" style="background:${TEAM[r.team]}"></span>${r.team}</span>
+    </button>`).join("") : `<div class="list-empty">Every request has an answer. New ones from the form or Slack land here.</div>`;
+  el.querySelectorAll(".req").forEach((b) => b.onclick = () => { sel = +b.dataset.i; reqs[sel].fresh = false; list(); detail(true); });
+  document.getElementById("cnt").textContent = reqs.length;
+  document.getElementById("cnt2").textContent = reqs.length;
+}
+
+function placement(r) {
+  const mine = [r.t, Math.round(score(r.s)), true];
+  const all = [...QUEUE.map(([t, s]) => [t, s, false]), mine].sort((a, b) => b[1] - a[1]);
+  return { all, pos: all.indexOf(mine) + 1 };
+}
+
+function detail(swap) {
+  const d = document.getElementById("detail");
+  const r = reqs[sel];
+  if (!r) { d.innerHTML = `<div class="d-head"><span>Inbox zero</span></div><div class="d-body"><p class="problem">Nothing waiting. Accepted requests are in the Queue.</p></div>`; return; }
+  const { pos } = placement(r);
+  d.innerHTML = `
+    <div class="d-head"><span>REQ-${r.id}</span><span aria-hidden="true">·</span><span>${r.team}</span>
+      <div class="sp"><button class="icon-btn" type="button" aria-label="Previous request" id="prev">${I.up}</button><button class="icon-btn" type="button" aria-label="Next request" id="next">${I.down}</button></div></div>
+    <div class="d-body${swap ? " swap" : ""}">
+      <div class="who">${av(r.who, true)}<b>${r.who}</b><span>requested ${r.when}</span></div>
+      <h3>${r.t}</h3>
+      <p class="problem">${r.p}</p>
+      <div class="facts"><span>${I.bolt}Touches ${r.touches.toLowerCase()}</span><span>${I.link}<a href="#" onclick="return false">${r.src}</a></span></div>
+      <div class="decide">
+        <div class="inputs">
+          <div class="in-row"><span class="lab" id="l-i">Impact</span><span class="steps" role="group" aria-labelledby="l-i">${[1,2,3,4,5].map((n) => `<button type="button" data-k="impact" data-v="${n}" class="${n <= r.s.impact ? "f" : ""}" aria-label="Impact ${n}"><i></i></button>`).join("")}</span><span class="val" id="v-impact">${r.s.impact} of 5</span></div>
+          <div class="in-row"><label class="lab" for="reach">Reach</label><input class="range" id="reach" type="range" min="5" max="400" step="5" value="${r.s.reach}"><span class="val" id="v-reach">${r.s.reach}/wk</span></div>
+          <div class="in-row"><span class="lab" id="l-c">Confidence</span><span class="steps" role="group" aria-labelledby="l-c">${[1,2,3].map((n) => `<button type="button" data-k="conf" data-v="${n}" class="${n <= r.s.conf ? "f" : ""}" aria-label="Confidence ${confPct[n-1]}%"><i></i></button>`).join("")}</span><span class="val" id="v-conf">${confPct[r.s.conf-1]}%</span></div>
+          <div class="in-row"><label class="lab" for="effort">Effort</label><input class="range" id="effort" type="range" min="1" max="20" step="1" value="${r.s.effort}"><span class="val" id="v-effort">${r.s.effort} days</span></div>
+        </div>
+        <div class="rank">
+          <span class="lab">Lands in the queue at</span>
+          <div class="big"><b id="pos">#${pos}</b><span id="sc">score ${Math.round(score(r.s))}</span></div>
+          <div class="mini" id="mini"></div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="b pri" type="button" id="accept">Accept <kbd>A</kbd></button>
+      <button class="b" type="button">Merge <kbd>M</kbd></button>
+      <button class="b ghost" type="button">Decline <kbd>D</kbd></button>
+      <span class="hint" id="hint">Accepting moves it to Idea at #${pos}</span>
+    </div>`;
+  d.querySelectorAll(".steps button").forEach((b) => b.onclick = () => { r.s[b.dataset.k] = +b.dataset.v; refresh(); });
+  ["reach", "effort"].forEach((k) => { const inp = d.querySelector("#" + k); paint(inp); inp.oninput = () => { r.s[k] = +inp.value; paint(inp); refresh(); }; });
+  d.querySelector("#prev").onclick = () => move(-1);
+  d.querySelector("#next").onclick = () => move(1);
+  d.querySelector("#accept").onclick = accept;
+  mini(true);
+}
+const paint = (inp) => inp.style.setProperty("--p", ((inp.value - inp.min) / (inp.max - inp.min)) * 100 + "%");
+
+function mini(first) {
+  const r = reqs[sel]; const box = document.getElementById("mini");
+  const { all, pos } = placement(r);
+  const start = Math.max(0, Math.min(pos - 3, all.length - 5));
+  const shown = all.slice(start, start + 5);
+  if (first || !box.children.length) {
+    box.innerHTML = all.map(([t]) => `<div data-t="${t}"><span></span><span>${t}</span><span></span></div>`).join("");
+  }
+  [...box.children].forEach((row) => {
+    const idx = all.findIndex(([t]) => t === row.dataset.t);
+    const k = idx - start;
+    const [, s, me] = all[idx];
+    row.classList.toggle("mine", !!me);
+    row.children[0].textContent = idx + 1; row.children[2].textContent = s;
+    row.style.transform = `translateY(${k * 30}px)`;
+    row.style.opacity = k < 0 || k > 4 ? "0" : "1";
+  });
+}
+
+function refresh() {
+  const r = reqs[sel]; const { pos } = placement(r);
+  document.querySelectorAll(".steps button").forEach((b) => b.classList.toggle("f", +b.dataset.v <= r.s[b.dataset.k]));
+  document.getElementById("v-impact").textContent = `${r.s.impact} of 5`;
+  document.getElementById("v-conf").textContent = `${confPct[r.s.conf - 1]}%`;
+  document.getElementById("v-reach").textContent = `${r.s.reach}/wk`;
+  document.getElementById("v-effort").textContent = `${r.s.effort} days`;
+  document.getElementById("sc").textContent = `score ${Math.round(score(r.s))}`;
+  const p = document.getElementById("pos");
+  if (p.textContent !== `#${pos}`) { p.textContent = `#${pos}`; p.classList.remove("tick"); void p.offsetWidth; p.classList.add("tick"); }
+  document.getElementById("hint").textContent = `Accepting moves it to Idea at #${pos}`;
+  mini();
+}
+
+function move(d) { if (!reqs.length) return; sel = (sel + d + reqs.length) % reqs.length; reqs[sel].fresh = false; list(); detail(true); }
+
+function accept() {
+  const r = reqs[sel]; if (!r) return;
+  const { pos } = placement(r);
+  const row = document.querySelector(`.req[data-i="${sel}"]`);
+  row.classList.add("leaving");
+  setTimeout(() => {
+    last = { r, at: sel };
+    reqs.splice(sel, 1); sel = Math.min(sel, reqs.length - 1); if (sel < 0) sel = 0;
+    list(); detail(true);
+    toast(`Accepted. “${r.t.length > 32 ? r.t.slice(0, 30) + "…" : r.t}” is #${pos} in the queue.`);
+  }, 200);
+}
+function undo() {
+  if (!last) return;
+  reqs.splice(last.at, 0, last.r); sel = last.at; last = null;
+  list(); detail(true); hideToast();
+}
+function toast(t) {
+  document.getElementById("toast-text").textContent = t;
+  document.getElementById("toast").classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(hideToast, 5000);
+}
+function hideToast() { document.getElementById("toast").classList.remove("show"); }
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input") && !["j", "k", "a"].includes(e.key)) return;
+  if (e.key === "j") move(1);
+  if (e.key === "k") move(-1);
+  if (e.key === "a") accept();
+});
+document.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
+  dir = b.dataset.pick;
+  document.querySelectorAll("[data-pick]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  document.getElementById("why").innerHTML = WHY[dir].map((x) => `<li>${x}</li>`).join("");
+  document.getElementById("app").dataset.dir = dir;
+}));
+document.getElementById("why").innerHTML = WHY.A.map((x) => `<li>${x}</li>`).join("");
+shell();
+</script>
