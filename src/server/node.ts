@@ -1,37 +1,44 @@
 /* Local and self-hosted entry point.
-     node src/server/node.ts            serve the API (and the built app, if dist/ exists)
-     node src/server/node.ts --reset    rebuild the database and load the sample data, then serve
-   Database: DATABASE_URL if set (any Postgres), otherwise PGlite, a real Postgres
-   running inside this process with its files in .data/, so nothing needs installing. */
+
+     node src/server/node.ts --demo     the sample backlog in PGlite, freshly reset (what `make demo` runs)
+     node src/server/node.ts            serve against DATABASE_URL, or PGlite in .data/ if it is unset
+     node src/server/node.ts --migrate  apply migrations to DATABASE_URL, then exit (use before a deploy)
+
+   Safety: sample data is only ever loaded into PGlite, or into DATABASE_URL when
+   SEED_SAMPLE=1 is set on purpose. `--demo` ignores DATABASE_URL entirely, so a
+   shell that exports a production URL can never have its tables reset by a demo. */
 
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { createApp } from "./app.ts";
 import { migrate, pglite, postgresJs, type Db } from "./db.ts";
+import { seedSql } from "./seed.ts";
 
 const root = new URL("../..", import.meta.url).pathname;
 const port = Number(process.env.PORT ?? 8787);
-const reset = process.argv.includes("--reset");
-const url = process.env.DATABASE_URL;
+const demo = process.argv.includes("--demo");
+const migrateOnly = process.argv.includes("--migrate");
+const url = demo ? undefined : process.env.DATABASE_URL;
 
-if (reset && !url) rmSync(join(root, ".data"), { recursive: true, force: true });
+if (migrateOnly && !url) { console.error("--migrate needs DATABASE_URL."); process.exit(1); }
+if (demo) rmSync(join(root, ".data"), { recursive: true, force: true });
 const db: Db = url ? await postgresJs(url) : await pglite(join(root, ".data"));
 
 const migrations = readdirSync(join(root, "migrations")).filter((f) => f.endsWith(".sql"))
   .map((name) => ({ name, sql: readFileSync(join(root, "migrations", name), "utf8") }));
 await migrate(db, migrations);
+if (migrateOnly) { console.log("Migrations applied."); await db.close(); process.exit(0); }
 
 const empty = (await db.query<{ n: number }>("SELECT count(*)::int AS n FROM items"))[0]?.n === 0;
-if (reset || empty) {
-  const seed = execFileSync(process.execPath, [join(root, "scripts/gen-seed.ts")], { encoding: "utf8" });
-  await db.exec(seed);
+const mayLoadSample = !url || process.env.SEED_SAMPLE === "1";
+if (demo || (empty && mayLoadSample)) {
+  await db.exec(seedSql());
   console.log("Loaded the sample backlog.");
 }
 
-const api = createApp(() => db, { writeKey: process.env.WRITE_KEY, demo: process.env.DEMO !== "0" });
+const api = createApp(() => db, { writeKey: process.env.WRITE_KEY, demo: !url || process.env.SEED_SAMPLE === "1" });
 const dist = join(root, "dist");
 if (existsSync(dist)) {
   api.use("/*", serveStatic({ root: "./dist" }));

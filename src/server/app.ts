@@ -124,13 +124,14 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       if ("system_url" in patch && patch.system_url == null && item.stage === "live") return { error: bad("A live item keeps its system link. Move it out of Live first.", 409) };
       const cur = item as unknown as Record<string, unknown>;
       const changed = Object.keys(patch).filter((k) => JSON.stringify(cur[k] ?? null) !== JSON.stringify(patch[k] ?? null));
-      if (!changed.length) return { item };
+      const confirm = b.confirm_score === true && Object.keys(patch).some((k) => SCORE.has(k));
+      if (!changed.length && !confirm) return { item };
       const sets: Record<string, unknown> = Object.fromEntries(changed.map((k) => [k, patch[k]]));
       const extra: string[] = ["updated_at = now()"];
-      if (changed.some((k) => SCORE.has(k))) { extra.push("scored_at = now()"); sets.scored_by = actor; }
+      if (confirm || changed.some((k) => SCORE.has(k))) { extra.push("scored_at = now()"); sets.scored_by = actor; }
       const keys = Object.keys(sets);
       await q(`UPDATE items SET ${[...keys.map((k, i) => `${k} = $${i + 2}`), ...extra].join(", ")} WHERE id = $1`, [item.id, ...keys.map((k) => sets[k])]);
-      await event(q, item.id, actor, "edited", `Changed ${changed.map((k) => NAME[k] ?? k).join(", ")}`);
+      await event(q, item.id, actor, "edited", changed.length ? `Changed ${changed.map((k) => NAME[k] ?? k).join(", ")}` : "Confirmed the score");
       return { item: await one(q, item.id) };
     });
     return "error" in result ? result.error! : c.json({ item: result.item });

@@ -1,4 +1,4 @@
-/* Sample data:  about 25 sample GTM engineering requests, dated relative
+/* Sample data:  24 sample GTM engineering requests, dated relative
    to the moment it runs, so the demo always looks like a live team's week.
    Generic work any B2B team recognizes; no real company, person or number. */
 

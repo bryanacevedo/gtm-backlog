@@ -8,11 +8,11 @@ Short records of the choices that shaped gtm-backlog: what was decided, what els
 **Rejected:** separate `requests` and `items` tables linked by a foreign key.
 **Why:** two tables would need a sync rule for every field the requester wrote, and an item that came from no request would be a special case. With one record, one history covers the item from first message to retirement.
 
-## 2. The score is computed by the database
+## 2. Nobody types a score
 
-**Decision:** `score` is a Postgres generated column: impact × reach × confidence ÷ effort. It is null when any input is missing.
-**Rejected:** storing a score the app calculates, or letting people type one.
-**Why:** a typed score can drift from its inputs, and nobody can tell when it has. A generated column can't. Null-when-incomplete keeps an unscored item from pretending to rank.
+**Decision:** the score is always computed from its four inputs: impact × reach × (confidence ÷ 100) ÷ effort, and empty when any input is missing. The app ranks with the shared `score()` function, so the queue can re-rank instantly as inputs change. Postgres carries the same formula as a generated column for reporting and SQL access, and a test runs both against real Postgres to prove they agree.
+**Rejected:** a score field people type in.
+**Why:** a typed score drifts from its inputs, and nobody can tell when it has. Empty-when-incomplete keeps an unscored item from pretending to rank.
 
 ## 3. Reach is always accounts per week
 
@@ -22,14 +22,14 @@ Short records of the choices that shaped gtm-backlog: what was decided, what els
 
 ## 4. The rules live in one file and are enforced three times
 
-**Decision:** `src/shared/domain.ts` defines which moves are allowed. The API refuses invalid moves, the app predicts the result so the screen updates immediately, and Postgres `CHECK` constraints back up the two rules that matter most.
+**Decision:** `src/shared/domain.ts` defines which moves are allowed. The API refuses invalid moves, the app predicts the result so the screen updates immediately, and Postgres `CHECK` constraints back up the ones that matter most: live needs a system link, declined or retired needs a reason, and every input stays in range.
 **Why:** an optimistic UI is only safe if the client and server can't disagree, and the database is the last line if anything skips the API.
 
 ## 5. Postgres everywhere, with PGlite for the demo
 
 **Decision:** real Postgres SQL locally and in production. Locally it runs as PGlite inside the process; in production it's any `DATABASE_URL`.
 **Rejected:** SQLite or D1 for the demo and Postgres for production.
-**Why:** one dialect means the demo exercises exactly the schema production runs, enums and generated columns included. A clone needs only Node.
+**Why:** one dialect means the demo exercises exactly the schema production runs, enums and generated columns included. A clone needs only Node 22.18 or newer. The demo always uses PGlite, even when `DATABASE_URL` is set, and sample data only goes into an external database when `SEED_SAMPLE=1` is set on purpose.
 
 ## 6. No component library
 

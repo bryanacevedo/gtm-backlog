@@ -13,7 +13,7 @@ Sales, marketing, partnerships and RevOps all ask GTM engineering for "a quick a
 ## What it does
 
 - **Triage is an inbox.** Each request arrives with who asked and why. You set four inputs and watch where it would land in the queue before you accept, merge or decline it. Declines need a reason the requester can read.
-- **The Queue ranks by value per day of work:** impact × reach × confidence ÷ effort. Every input has its own column, and a score nobody has checked in 60 days fades and says so.
+- **The Queue ranks by value per day of work:** impact × reach × (confidence ÷ 100) ÷ effort. Every input has its own column, and a score nobody has confirmed in 60 days fades and says so.
 - **The Board moves work from idea to building to live.** Nothing goes live without a link to the running system.
 - **Shipped is the leadership changelog.** It groups work by month and shows each system's latest measured result. A live system with no result for 30 days is flagged as silent.
 
@@ -24,21 +24,28 @@ Sales, marketing, partnerships and RevOps all ask GTM engineering for "a quick a
 
 ## Run it
 
+Needs Node 22.18 or newer (it runs TypeScript directly). Nothing else: no accounts, no keys, no Docker.
+
 ```bash
 git clone https://github.com/bryanacevedo/gtm-backlog && cd gtm-backlog
 npm install
 make demo        # builds, loads the sample backlog, serves http://localhost:8787
 ```
 
-No accounts, no keys, no Docker. The demo runs real Postgres inside the process ([PGlite](https://pglite.dev)), with the data stored in `.data/`.
+The demo runs real Postgres inside the process ([PGlite](https://pglite.dev)), stored in `.data/`. It always uses that built-in database, even if your shell has `DATABASE_URL` set, so it can never reset a real one.
 
-To use your own Postgres (Supabase, Neon, RDS, local), set `DATABASE_URL`. Migrations apply on start.
+**Your own Postgres** (Supabase, Neon, RDS, local):
 
 ```bash
-DATABASE_URL=postgresql://… npm start
+npm run build
+DATABASE_URL=postgresql://… WRITE_KEY=choose-a-secret npm start
 ```
 
-`make test` runs the unit tests and the typecheck. `node scripts/audit-layout.mjs` checks alignment in a real browser (needs Chrome).
+Migrations apply on start. Your database starts empty; add `SEED_SAMPLE=1` only if you want the sample backlog in it. With `WRITE_KEY` set, changes need that key, so leave it unset only on a private network.
+
+**Deploy to Cloudflare Workers:** run `DATABASE_URL=… npm run migrate` once, then `npx wrangler secret put DATABASE_URL` and `npm run deploy`. The Worker does not run migrations itself.
+
+**Checks:** `make test` runs the unit tests, the database tests (real Postgres via PGlite) and the typecheck. `node scripts/audit-layout.mjs` checks alignment in a real browser against the running demo (`make demo` first; set `CHROME` to your Chrome binary outside macOS).
 
 ## Architecture
 
@@ -63,7 +70,7 @@ flowchart LR
 |---|---|---|
 | Rules | `src/shared/domain.ts`, pure functions | The API enforces them, and the app uses the same code to apply moves before the server answers, so the two can't disagree. |
 | API | Hono, one transaction per write, every write logged as an event | The activity feed doubles as the audit trail. Moves lock the row, so two people can't both win a race. |
-| Database | Postgres 15+ | Stage enum; score as a generated column; `CHECK` constraints for "live needs a system link" and "declined needs a reason"; a ranked `queue` view. The rules hold even if someone skips the API. |
+| Database | Postgres 15+ | Stage enum; `CHECK` constraints for "live needs a system link", "declined or retired needs a reason", no self-merge and every input range. The rules hold even if someone skips the API. A generated `score` column and a ranked `queue` view mirror the app's math for reporting, and a test proves they match. |
 | Local | PGlite (Postgres compiled to WebAssembly) | `make demo` works on any machine with Node and nothing else. |
 | Hosted | Cloudflare Workers + Supabase Postgres | The same Hono app as local. A nightly cron reloads the demo. |
 | UI | React + Vite, no component library | Small, fast, and every component built for this product. |
@@ -72,13 +79,13 @@ More detail: [docs/SPEC.md](docs/SPEC.md) for the product, and [docs/DECISIONS.m
 
 ## What's real and what's sample
 
-- **Real:** the rules, the API, the database schema, the scoring, every view, keyboard control, optimistic moves with rollback, the activity log, and the nightly reset.
+- **Real:** the rules, the API, the database schema, the scoring, every view, keyboard control, optimistic moves with rollback, the activity log, and the nightly reset. The hosted demo leaves `WRITE_KEY` unset so visitors can try everything; it resets every night.
 - **Sample:** the 24 requests and the people. The team and their names are fictional. Avatar photos are from Unsplash (see [CREDITS.md](CREDITS.md)).
 - **Not built yet:** Slack intake (`/request`), roles and per-person accounts.
 
 ## Keyboard
 
-`1` to `4` switch views, `j` and `k` move through rows, `↵` opens, `←` and `→` move a card between stages, `a`, `m` and `d` decide in Triage, `c` opens a new request, `?` lists every key.
+`1` to `4` switch views, `j` and `k` move through rows (Triage, Queue, Board), `↵` opens, `←` and `→` move a card between stages, `a`, `m` and `d` decide in Triage, `c` opens a new request, `Esc` closes or goes back, `?` lists every key.
 
 ## License
 

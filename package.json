@@ -7,12 +7,13 @@
   "scripts": {
     "dev": "concurrently -k -n api,app \"node --watch src/server/node.ts\" \"vite\"",
     "build": "vite build",
-    "demo": "vite build && node src/server/node.ts --reset",
-    "db:reset": "node src/server/node.ts --reset",
+    "demo": "vite build && node src/server/node.ts --demo",
+    "db:reset": "node src/server/node.ts --demo",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "deploy": "vite build && wrangler deploy",
-    "start": "node src/server/node.ts"
+    "start": "node src/server/node.ts",
+    "migrate": "node src/server/node.ts --migrate"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",

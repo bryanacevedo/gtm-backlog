@@ -44,9 +44,9 @@ A request and a backlog item are the same record. Submitting a request creates a
 | confidence | 50, 80 or 100 | percent sure the impact is real |
 | effort | days | engineering days to ship |
 
-The score is a generated column in Postgres, so it can't be typed by hand. It is relative: it ranks items against each other and means nothing alone. If any input is missing, the item is "Unscored" and ranks after every scored item, oldest first.
+Nobody types a score. The app ranks with a shared function, and Postgres carries the same formula as a generated column (a test proves they agree). It is relative: it ranks items against each other and means nothing alone. If any input is missing, the item is "Unscored" and ranks after every scored item, oldest first.
 
-**Every number carries its source and its age.** Score inputs record who set them and when. A score older than 60 days renders faded and says so. A shipped result carries its measurement date.
+**Every number carries its source and its age.** Score inputs record who set them and when. A score nobody has confirmed in 60 days renders faded and says so; saving the score again, even unchanged, confirms it. A shipped result carries its measurement date.
 
 **Silent:** a live item with no logged result for 30 days, counted from its last result or from going live. Silent items are marked on the Board and on Shipped.
 

@@ -115,7 +115,8 @@ export async function createItem(input: Record<string, unknown>): Promise<Item |
 export async function patchItem(id: string, patch: Record<string, unknown>): Promise<boolean> {
   const before = state.data?.items.find((i) => i.id === id);
   if (!before) return false;
-  replaceItem({ ...before, ...(patch as Partial<Item>) });
+  const { confirm_score: _c, ...visible } = patch;
+  replaceItem({ ...before, ...(visible as Partial<Item>) });
   try {
     const { item } = await call<{ item: Item }>("PATCH", `/api/items/${id}`, patch);
     replaceItem(item); flash(id); refreshEvents();

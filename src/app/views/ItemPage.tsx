@@ -128,7 +128,7 @@ function ScoreSection({ item, now }: { item: Item; now: Date }) {
   useEffect(() => { if (!editing) setD(init()); }, [item, editing]); // eslint-disable-line react-hooks/exhaustive-deps
   const s = score(item);
   const stale = isScoreStale(item, now);
-  const save = async () => { setBusy(true); const ok = await patchItem(item.id, d); setBusy(false); if (ok) setEditing(false); };
+  const save = async () => { setBusy(true); const ok = await patchItem(item.id, { ...d, confirm_score: true }); setBusy(false); if (ok) setEditing(false); };
   const fig = (v: number | null, unit = "") => (v == null ? <span className="nil">–</span> : <>{fmtNum(v)}{unit}</>);
 
   return (
