@@ -1,5 +1,7 @@
 # gtm-backlog
 
+[![ci](https://github.com/bryanacevedo/gtm-backlog/actions/workflows/ci.yml/badge.svg)](https://github.com/bryanacevedo/gtm-backlog/actions/workflows/ci.yml)
+
 **The backlog for a GTM engineering team.** Requests land in one inbox, get ranked by what they're worth to revenue, move from idea to live, and keep reporting what they did after they ship.
 
 **Live demo:** https://gtm-backlog.leandrive.workers.dev (sample data, editable, resets nightly)
