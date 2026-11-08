@@ -6,6 +6,8 @@
 
 **Live demo:** https://gtm-backlog.leandrive.workers.dev (sample data, editable, resets nightly)
 
+[![Watch the 66-second walkthrough](docs/screens/video-poster.jpg)](https://gtm-backlog.leandrive.workers.dev/video/gtm-backlog.mp4)
+
 ![Triage: requests on the left, the decision on the right, and a live preview of where the request lands in the queue](docs/screens/triage.png)
 
 ## The problem

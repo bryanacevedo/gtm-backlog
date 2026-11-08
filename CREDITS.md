@@ -23,3 +23,9 @@ The photographers are credited here anyway. The names are invented and do not de
 ## Fonts
 
 Geist and Geist Mono by Vercel, under the SIL Open Font License 1.1, self-hosted through Fontsource.
+
+## Walkthrough video
+
+- Music: "Product" by [leberch](https://pixabay.com/users/leberch-42823964/), from [Pixabay](https://pixabay.com/music/upbeat-product-437476/) under the Pixabay Content License.
+- Sound effects: rendered from the [earshot](https://github.com/Leonxlnx/earshot) sound bank.
+- Built with [HyperFrames](https://github.com/heygen-com/hyperframes) from the app's own screens.
