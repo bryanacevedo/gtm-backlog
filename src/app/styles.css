@@ -79,7 +79,6 @@ p { margin: 0; }
 .av.sm { width: 18px; height: 18px; font-size: 8px; }
 .av.lg { width: 26px; height: 26px; font-size: 10.5px; }
 .av.none { background: transparent; border: 1px dashed var(--ink-4); }
-.tdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: none; margin-right: 7px; vertical-align: 0.5px; }
 
 /* ------------------------------------------------------------------- shell */
 
@@ -395,7 +394,7 @@ table.grid { width: 100%; border-collapse: collapse; font: var(--t-data); }
 .score-row .meter { padding: 14px 16px; }
 .score-row .meter .fig { font-size: 21px; line-height: 26px; }
 .score-card .foot { padding: 10px 16px; border-top: 1px solid var(--line); font: var(--t-meta); color: var(--ink-3); }
-.score-card .foot.warn { color: var(--warn); }
+.score-card .foot.warn { color: var(--ink-1); font-weight: 600; }
 .score-edit { padding: 16px 18px; display: grid; gap: 14px; }
 .panel-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
 .panel-actions .hint { margin-right: auto; }

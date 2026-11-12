@@ -87,7 +87,7 @@ export function ItemPage({ id, shared }: { id: string; shared: Shared }) {
               <div className="prop"><dt>Source</dt><dd><Inline kind="url" value={item.link} display={item.link ? host(item.link) : undefined} placeholder="Add the thread or doc" ariaLabel="source link" onSave={save("link")} /></dd></div>
               <div className="prop"><dt>System</dt><dd><Inline kind="url" value={item.system_url} display={item.system_url ? host(item.system_url) : undefined} placeholder="Link it when it ships" ariaLabel="system link" onSave={save("system_url")} /></dd></div>
             </dl>
-            {item.system_url && <a className="hint link" href={item.system_url} target="_blank" rel="noreferrer" style={{ justifySelf: "start" }}>Open the running system</a>}
+            {item.system_url && <a className="btn quiet compact" href={item.system_url} target="_blank" rel="noreferrer" style={{ justifySelf: "start" }}>Open the running system</a>}
           </section>
         </div>
 

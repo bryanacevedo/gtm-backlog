@@ -45,11 +45,6 @@ export function StageLabel({ stage, silent = false }: { stage: Stage; silent?: b
 
 /* ------------------------------------------------------------- people, teams */
 
-/* Team colors are data, not decoration: a 7px dot next to the team name. */
-export const TEAM_COLOR: Record<string, string> = {
-  Sales: "#2563EB", SDR: "#0E7490", Marketing: "#DB2777", "Field Marketing": "#D97706",
-  "Demand Gen": "#EA580C", RevOps: "#0D9488", Partnerships: "#65A30D", "Customer Success": "#B45309",
-};
 const PERSON_COLORS = ["#C2410C", "#1D4ED8", "#BE185D", "#0F766E", "#3F3F46", "#B45309", "#15803D", "#9F1239", "#0369A1", "#4D7C0F"];
 
 /* Photos for the fictional sample team, from Unsplash (see CREDITS.md).
@@ -87,7 +82,7 @@ export function Avatar({ name, size }: { name: string | null; size?: "sm" | "lg"
 }
 
 export function Team({ name }: { name: string }) {
-  return <><span className="tdot" style={{ background: TEAM_COLOR[name] ?? "#A1A1AA" }} aria-hidden="true" />{name}</>;
+  return <>{name}</>;
 }
 
 /* ------------------------------------------------------------------- icons */
