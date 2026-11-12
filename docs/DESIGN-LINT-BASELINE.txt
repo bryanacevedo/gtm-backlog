@@ -1,0 +1,3 @@
+src/app/styles.css	warm-warning	.score-card .foot.warn { color: var(--warn) }
+src/app/ui.tsx	dot	<... className="tdot" style={{ background: TEAM_COLOR[name] ?? "#A1A1AA" }}> (7px round)
+src/app/views/ItemPage.tsx	text-link-cta	<a className="hint link"> Open the running system
