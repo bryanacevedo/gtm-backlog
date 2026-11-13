@@ -6,5 +6,6 @@
 **Cloudflare:** the Worker (`wrangler.toml`, `src/server/worker.ts`, `npm run deploy`) still works and is untouched. Not retired; Bryan decides.
 
 ## History
+- 2026-11-13: keep-alive (backlog-keepalive). The nightly job, and the start-up catch-up, also run one read-only `SELECT 1` against the real database when `DATABASE_URL` is set, so the free Supabase project never pauses; one log line, no connection details, never fails the job (`keepAlive` in `src/server/nightly.ts`, tests in `tests/nightly.test.ts`). CI (`.github/workflows/ci.yml`) now runs install, typecheck, tests, build and design-lint (the old `--reset` boot step is gone).
 - 2026-11-13: Google sign-in for the real backlog beside the public demo (backlog-login). Opus security review fixed: domain match needs Google's hd claim, https-only PUBLIC_URL, script writes logged as `script: name`.
 - 2026-11-12: moved the live demo from Cloudflare Workers to Render so every desk runs on one stack.

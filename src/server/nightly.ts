@@ -39,3 +39,19 @@ export function scheduleNightly(job: () => Promise<void>, now: () => number = Da
   arm();
   return () => clearTimeout(timer);
 }
+
+/** Keep a free Supabase project from pausing: one tiny read-only query against the real database.
+    Never throws, never writes, never logs connection details (only the outcome). Returns the log line. */
+export async function keepAlive(open: (() => Promise<{ query: (text: string) => Promise<unknown[]> }>) | null, log: (line: string) => void = console.log): Promise<string | null> {
+  if (!open) return null;
+  let line: string;
+  try {
+    const db = await open();
+    await db.query("SELECT 1 AS ok");
+    line = "Keep-alive: the real database answered.";
+  } catch {
+    line = "Keep-alive: the real database did not answer; will try again tomorrow.";
+  }
+  log(line);
+  return line;
+}

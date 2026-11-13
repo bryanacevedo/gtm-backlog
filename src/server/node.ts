@@ -23,7 +23,7 @@ import { authConfigFromEnv } from "./auth.ts";
 import { createHosted } from "./hosted.ts";
 import { migrate, pglite, postgresJs, type Db } from "./db.ts";
 import { seedSql } from "./seed.ts";
-import { sampleIsStale, scheduleNightly } from "./nightly.ts";
+import { keepAlive, sampleIsStale, scheduleNightly } from "./nightly.ts";
 
 const root = new URL("../..", import.meta.url).pathname;
 const port = Number(process.env.PORT ?? 8787);
@@ -60,6 +60,12 @@ if (mayLoadSample && !demo && !empty) {
 if (demo || (empty && mayLoadSample) || missed) await reload();
 // The Cloudflare cron's job, in-process: reload the sample every night at 06:00 UTC.
 if (mayLoadSample) scheduleNightly(reload);
+// The real database (DATABASE_URL) gets one tiny read each night too, so a free Supabase project never pauses.
+// `realTarget` is set below in hosted mode (the real space) or here when the server itself runs on DATABASE_URL.
+let realTarget: (() => Promise<Db>) | null = !demo && url ? async () => db : null;
+const nightlyKeepAlive = async () => { await keepAlive(realTarget); };
+scheduleNightly(nightlyKeepAlive);
+if (realTarget) void nightlyKeepAlive(); // catch-up on start
 
 const dist = join(root, "dist");
 let closeReal: () => Promise<void> = async () => {};
@@ -84,7 +90,7 @@ if (hosted) {
     return p;
   };
   closeReal = async () => { await real?.then((d) => d.close()).catch(() => {}); };
-  if (realUrl) openReal().catch(() => {});
+  if (realUrl) { realTarget = openReal; openReal().catch(() => {}); nightlyKeepAlive(); }
   const signinFile = join(dist, "signin.html");
   const signinHtml = existsSync(signinFile) ? readFileSync(signinFile, "utf8") : "<!doctype html><title>GTM Backlog</title><!--message--><form method=\"post\" action=\"/auth/demo\"><button>Try the demo</button></form>";
   api = createHosted({ demoDb: db, realDb: realUrl ? openReal : null, auth, writeKey: process.env.WRITE_KEY || undefined, signinHtml });
