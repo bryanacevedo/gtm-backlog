@@ -83,11 +83,11 @@ afterAll(() => db.close());
 
 const put = (key: string, value: unknown, actor = "Ana") =>
   app.request(`/api/settings/${key}`, { method: "PUT", headers: { "content-type": "application/json", "x-actor": actor }, body: JSON.stringify({ value }) });
-const state = async () => (await (await app.request("/api/state")).json()) as { meta: { settings: { accent: string; team_colors: Record<string, string> } }; events: { kind: string; item_id: string | null; actor: string; detail: string }[] };
+const state = async () => (await (await app.request("/api/state")).json()) as { meta: { settings: { accent: string; team_colors: Record<string, string>; team_glyphs: Record<string, string | null> } }; events: { kind: string; item_id: string | null; actor: string; detail: string }[] };
 
 describe("PUT /api/settings/:key", () => {
   it("starts on the default accent with no stored team colours", async () => {
-    expect((await state()).meta.settings).toEqual({ accent: DEFAULT_ACCENT, team_colors: {} });
+    expect((await state()).meta.settings).toEqual({ accent: DEFAULT_ACCENT, team_colors: {}, team_glyphs: {} });
   });
   it("stores the accent, normalised, and exposes it in the state", async () => {
     const res = await put("accent", "c2410c");
@@ -116,6 +116,19 @@ describe("PUT /api/settings/:key", () => {
     expect(((await dup.json()) as { error: string }).error).toMatch(/cannot share/);
     expect((await put("team_colors", { Sales: "#123456" })).status).toBe(400);
     expect((await state()).meta.settings.team_colors).toEqual({ Sales: "#A663AC" });
+  });
+  it("stores team glyphs, refuses an unknown glyph and a glyph two teams would share", async () => {
+    expect((await put("team_glyphs", { Sales: "diamond", SDR: null })).status).toBe(200);
+    expect((await state()).meta.settings.team_glyphs).toEqual({ Sales: "diamond", SDR: null });
+    const dup = await put("team_glyphs", { Sales: "bolt", SDR: "bolt" });
+    expect(dup.status).toBe(400);
+    expect(((await dup.json()) as { error: string }).error).toMatch(/cannot share/);
+    const bad = await put("team_glyphs", { Sales: "smiley" });
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { error: string }).error).toMatch(/glyphs offered/);
+    expect((await put("team_glyphs", ["bolt"])).status).toBe(400);
+    expect((await state()).meta.settings.team_glyphs).toEqual({ Sales: "diamond", SDR: null });
+    expect((await state()).events.find((x) => x.kind === "settings")!.detail).toBe("Changed the team glyphs");
   });
   it("refuses a setting that does not exist", async () => {
     expect((await put("theme", "dark")).status).toBe(404);

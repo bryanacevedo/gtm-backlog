@@ -1,5 +1,7 @@
-/* Per-install settings: the accent colour and the team colours. Pure functions, no I/O, shared by the API (which
+/* Per-install settings: the accent colour, the team colours and the team glyphs. Pure functions, no I/O, shared by the API (which
    validates every write) and the app (which previews a choice and says why one is refused). */
+
+import { checkTeamGlyphs } from "./glyphs.ts";
 
 /* ------------------------------------------------------------------ colour */
 
@@ -155,10 +157,10 @@ export function pickPhoto(name: string, o: { uploaded?: Record<string, string> |
 
 /* ----------------------------------------------------------------- the API */
 
-export const SETTING_KEYS = ["accent", "team_colors"] as const;
+export const SETTING_KEYS = ["accent", "team_colors", "team_glyphs"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
-export interface Settings { accent: string; team_colors: Record<string, string> }
+export interface Settings { accent: string; team_colors: Record<string, string>; team_glyphs: Record<string, string | null> }
 
 /** Validates one setting write. */
 export function checkSetting(key: string, value: unknown): { value: unknown } | { error: string } {
@@ -167,5 +169,6 @@ export function checkSetting(key: string, value: unknown): { value: unknown } | 
     return err ? { error: err } : { value: normalizeHex(value) };
   }
   if (key === "team_colors") return checkTeamColors(value);
+  if (key === "team_glyphs") return checkTeamGlyphs(value);
   return { error: "No such setting." };
 }

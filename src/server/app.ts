@@ -11,7 +11,7 @@ import {
   TEAMS, TOUCHES, canLogResults, label, moveError, validateInputs,
   type EventRow, type Item, type ShipLogEntry, type Stage,
 } from "../shared/domain.ts";
-import { DEFAULT_ACCENT, accentError, checkPhoto, checkSetting, normalizeHex, type Settings } from "../shared/settings.ts";
+import { DEFAULT_ACCENT, accentError, checkPhoto, checkSetting, normalizeHex, SETTING_KEYS, type SettingKey, type Settings } from "../shared/settings.ts";
 import { kindWord, parseWorkLink, readPullRequest, type WorkLink } from "../shared/work.ts";
 
 /** Which data space a request reaches, decided by the caller's credentials and nothing the request names. */
@@ -73,7 +73,8 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const rows = await db.query<{ key: string; val: unknown }>("SELECT key, value AS val FROM settings");
     const stored = Object.fromEntries(rows.map((r) => [r.key, r.val]));
     const accent = normalizeHex(stored.accent);
-    return { accent: accent && !accentError(accent) ? accent : defaultAccent, team_colors: (stored.team_colors && typeof stored.team_colors === "object" ? stored.team_colors : {}) as Record<string, string> };
+    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+    return { accent: accent && !accentError(accent) ? accent : defaultAccent, team_colors: obj(stored.team_colors) as Record<string, string>, team_glyphs: obj(stored.team_glyphs) as Record<string, string | null> };
   };
 
   /** Uploaded photos by person's name. The addresses they are stored under never leave the server. */
@@ -331,12 +332,12 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const key = c.req.param("key");
     const b = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
     const checked = checkSetting(key, b.value);
-    if ("error" in checked) return bad(checked.error, key === "accent" || key === "team_colors" ? 400 : 404);
+    if ("error" in checked) return bad(checked.error, SETTING_KEYS.includes(key as SettingKey) ? 400 : 404);
     const actor = c.get("actor");
     const db = dbOf(c);
     await db.tx(async (q) => {
       await q("INSERT INTO settings (key, value, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", [key, JSON.stringify(checked.value)]);
-      await event(q, null, actor, "settings", key === "accent" ? `Set the accent colour to ${checked.value}` : "Changed the team colours");
+      await event(q, null, actor, "settings", key === "accent" ? `Set the accent colour to ${checked.value}` : key === "team_glyphs" ? "Changed the team glyphs" : "Changed the team colours");
     });
     return c.json({ key, value: checked.value, settings: await readSettings(db) });
   });
