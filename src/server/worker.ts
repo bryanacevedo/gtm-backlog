@@ -12,6 +12,8 @@ interface Env {
   DATABASE_URL: string;
   WRITE_KEY?: string;
   DEMO?: string;
+  ACCENT?: string;
+  GITHUB_TOKEN?: string;
   ASSETS: { fetch(req: Request): Promise<Response> };
 }
 interface Ctx { waitUntil(p: Promise<unknown>): void }
@@ -43,7 +45,7 @@ export default {
     if (!path.startsWith("/api/")) return env.ASSETS.fetch(req);
     // One short-lived connection per request through Supabase's transaction pooler.
     const db = await postgresJs(env.DATABASE_URL, { max: 1 });
-    const app = createApp(() => db, { writeKey: env.WRITE_KEY, demo: env.DEMO !== "0" });
+    const app = createApp(() => db, { writeKey: env.WRITE_KEY, demo: env.DEMO !== "0", accent: env.ACCENT, githubToken: env.GITHUB_TOKEN });
     const res = await app.fetch(req);
     ctx.waitUntil(db.close());
     return res;

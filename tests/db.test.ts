@@ -1,7 +1,7 @@
 /* The schema against real Postgres (PGlite): the database's generated score must
    equal the shared score() the app ranks by, and the CHECK constraints must hold
    even when the API is bypassed. */
-import { readFileSync } from "node:fs";
+import { allMigrations } from "./migrations";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate, pglite, type Db } from "../src/server/db";
 import { score } from "../src/shared/domain";
@@ -9,7 +9,7 @@ import { score } from "../src/shared/domain";
 let db: Db;
 beforeAll(async () => {
   db = await pglite();
-  await migrate(db, [{ name: "0001_init.sql", sql: readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8") }]);
+  await migrate(db, allMigrations());
 });
 afterAll(() => db.close());
 

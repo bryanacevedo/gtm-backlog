@@ -66,10 +66,10 @@ export interface ShipLogEntry {
 
 export interface EventRow {
   id: string;
-  item_id: string;
+  item_id: string | null; // null for a change that belongs to no item (a setting)
   at: string;
   actor: string;
-  kind: "created" | "triaged" | "moved" | "edited" | "logged";
+  kind: "created" | "triaged" | "moved" | "edited" | "logged" | "settings";
   detail: string; // short human sentence, already formatted
 }
 
@@ -144,6 +144,15 @@ export function label(s: Stage): string {
   return { triage: "Triage", idea: "Idea", building: "Building", live: "Live", declined: "Declined", retired: "Retired" }[s];
 }
 
+/* ----------------------------------------------------------------- results */
+
+/** Results are logged from the day the build starts (dry runs, first numbers), not only once it is live. */
+export const RESULT_STAGES: Stage[] = ["building", "live"];
+export const canLogResults = (stage: Stage) => RESULT_STAGES.includes(stage);
+
+/** A line of work the item page lists: building and live, and a retired item that ran. */
+export const hasWork = (item: Pick<Item, "stage" | "live_at">) => item.stage === "building" || item.stage === "live" || (item.stage === "retired" && item.live_at != null);
+
 /* ------------------------------------------------------------------ silent */
 
 export const SILENT_AFTER_DAYS = 30;
@@ -177,3 +186,14 @@ export const IMPACT_RUBRIC: Record<number, string> = {
   4: "Creates or protects pipeline",
   5: "Moves bookings this quarter",
 };
+
+/* Plain-language definitions of the score's words. One source for every place a score input or column appears:
+   the first line says what it is, any lines after are the scale. */
+export const SCORE_HELP = {
+  impact: ["How much one success moves revenue, from 1 to 5.", ...[1, 2, 3, 4, 5].map((n) => `${n}  ${IMPACT_RUBRIC[n]}`)],
+  reach: ["How many accounts it touches in a week. Count accounts, not people or records."],
+  confidence: ["How sure we are that the impact and reach numbers are right.", "50%  A guess", "80%  Some evidence", "100%  Measured"],
+  effort: ["Engineering days to build it."],
+  score: ["Impact × reach × confidence ÷ effort.", "Higher means more value per day of work."],
+} as const;
+export type ScoreWord = keyof typeof SCORE_HELP;

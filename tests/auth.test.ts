@@ -1,7 +1,7 @@
 /* Sign-in and the two data spaces. Google is never called: a fake `fetch` plays its token endpoint and its
    signing keys, with a key pair made here. Two in-memory Postgres databases stand in for the demo and the real space. */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { allMigrations } from "./migrations";
 import { SignJWT, exportJWK, generateKeyPair, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { authConfigFromEnv, cleanPicture, isAllowed, sign, SESSION_SECONDS, type AuthConfig } from "../src/server/auth";
@@ -47,9 +47,8 @@ beforeAll(async () => {
   good = (await generateKeyPair("RS256", { extractable: true })) as CryptoKeyPair;
   other = (await generateKeyPair("RS256", { extractable: true })) as CryptoKeyPair;
   jwk = { ...(await exportJWK(good.publicKey)), kid: "k1", alg: "RS256", use: "sig" };
-  const sql = readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8");
   demoDb = await pglite(); realDb = await pglite();
-  for (const d of [demoDb, realDb]) await migrate(d, [{ name: "0001_init.sql", sql }]);
+  for (const d of [demoDb, realDb]) await migrate(d, allMigrations());
   await realDb.query("INSERT INTO items (id, title, problem, team, requester) VALUES ('real1', 'REAL-SECRET', 'p', 'Sales', 'r')");
   await demoDb.query("INSERT INTO items (id, title, problem, team, requester) VALUES ('demo1', 'DEMO-SAMPLE', 'p', 'Sales', 'r')");
   app = createHosted({ demoDb, realDb: async () => realDb, auth: cfg, writeKey: "team-key", fetch: googleFetch, signinHtml: SIGNIN });

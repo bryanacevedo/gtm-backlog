@@ -93,10 +93,10 @@ if (hosted) {
   if (realUrl) { realTarget = openReal; openReal().catch(() => {}); nightlyKeepAlive(); }
   const signinFile = join(dist, "signin.html");
   const signinHtml = existsSync(signinFile) ? readFileSync(signinFile, "utf8") : "<!doctype html><title>GTM Backlog</title><!--message--><form method=\"post\" action=\"/auth/demo\"><button>Try the demo</button></form>";
-  api = createHosted({ demoDb: db, realDb: realUrl ? openReal : null, auth, writeKey: process.env.WRITE_KEY || undefined, signinHtml });
+  api = createHosted({ demoDb: db, realDb: realUrl ? openReal : null, auth, writeKey: process.env.WRITE_KEY || undefined, accent: process.env.ACCENT || undefined, githubToken: process.env.GITHUB_TOKEN || undefined, signinHtml });
   console.log(`Spaces: demo${realUrl ? " + real" : ""}; Google sign-in ${auth && realUrl ? "on" : "off"}; write key ${process.env.WRITE_KEY && realUrl ? "on" : "off"}.`);
 } else {
-  api = createApp(() => db, { writeKey: process.env.WRITE_KEY, demo: !url || process.env.SEED_SAMPLE === "1" });
+  api = createApp(() => db, { writeKey: process.env.WRITE_KEY, demo: !url || process.env.SEED_SAMPLE === "1", accent: process.env.ACCENT || undefined, githubToken: process.env.GITHUB_TOKEN || undefined });
 }
 if (existsSync(dist)) {
   // Safari (so every iPhone) will not play an MP4 served whole with a 200: answer byte ranges, as the Worker does.

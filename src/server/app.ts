@@ -8,9 +8,11 @@ import { Hono, type Context } from "hono";
 import type { Db } from "./db.ts";
 import { safeEqual } from "./safe.ts";
 import {
-  TEAMS, TOUCHES, label, moveError, validateInputs,
+  TEAMS, TOUCHES, canLogResults, label, moveError, validateInputs,
   type EventRow, type Item, type ShipLogEntry, type Stage,
 } from "../shared/domain.ts";
+import { DEFAULT_ACCENT, accentError, checkSetting, normalizeHex, type Settings } from "../shared/settings.ts";
+import { kindWord, parseWorkLink, readPullRequest, type WorkLink } from "../shared/work.ts";
 
 /** Which data space a request reaches, decided by the caller's credentials and nothing the request names. */
 export interface Space {
@@ -26,6 +28,12 @@ export interface Space {
 export interface AppConfig {
   writeKey?: string;
   demo: boolean;
+  /** The accent used when a space has none stored (the ACCENT variable). Ignored unless it passes the same checks as a setting. */
+  accent?: string;
+  /** GITHUB_TOKEN: raises the limit when a pasted pull request is looked up on GitHub. Real space only, never logged. */
+  githubToken?: string;
+  /** Replaceable in tests. */
+  fetch?: typeof fetch;
   /** Hosted mode: choose the space per request (or answer with a Response, such as a refusal). */
   resolve?: (c: Context) => Promise<Space | Response>;
 }
@@ -34,6 +42,9 @@ type Ctx = { Variables: { actor: string; space: Space } };
 const ITEM_COLS = `id, title, problem, team, requester, touches, link, stage::text AS stage, owner, impact, reach, confidence,
   effort_days, scored_at, scored_by, system_url, target_date::text AS target_date, decision_note, merged_into, live_at,
   created_at, updated_at, stage_changed_at`;
+
+const WORK_COLS = "id, item_id, kind, url, title, state, meta, created_at, created_by";
+const LOG_COLS = "id, item_id, date::text AS date, metric, value, unit, note, source_url, created_at";
 
 const newId = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 const isUrl = (s: unknown) => typeof s === "string" && /^https?:\/\/\S+$/.test(s);
@@ -46,8 +57,22 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
 
   const one = async (q: Db["query"], id: string) =>
     (await q<Item>(`SELECT ${ITEM_COLS} FROM items WHERE id = $1`, [id]))[0] ?? null;
-  const event = (q: Db["query"], item: string, actor: string, kind: EventRow["kind"], detail: string) =>
+  const event = (q: Db["query"], item: string | null, actor: string, kind: EventRow["kind"], detail: string) =>
     q("INSERT INTO events (id, item_id, actor, kind, detail) VALUES ($1, $2, $3, $4, $5)", [newId("ev"), item, actor, kind, detail]);
+
+  /** Stored settings over the install's defaults. */
+  const defaultAccent = (() => {
+    const hex = normalizeHex(cfg.accent);
+    if (cfg.accent?.trim() && (!hex || accentError(hex))) console.warn("ACCENT is ignored: it must be a six-digit colour that white text can be read on (contrast 4.5 to 1 or better).");
+    return hex && !accentError(hex) ? hex : DEFAULT_ACCENT;
+  })();
+  const readSettings = async (db: Db): Promise<Settings> => {
+    // `value` is aliased: db.clean() turns any column called value into a number (the ship log's), and a setting is JSON.
+    const rows = await db.query<{ key: string; val: unknown }>("SELECT key, value AS val FROM settings");
+    const stored = Object.fromEntries(rows.map((r) => [r.key, r.val]));
+    const accent = normalizeHex(stored.accent);
+    return { accent: accent && !accentError(accent) ? accent : defaultAccent, team_colors: (stored.team_colors && typeof stored.team_colors === "object" ? stored.team_colors : {}) as Record<string, string> };
+  };
 
   /* ---------------------------------------------------------- write gate */
 
@@ -78,12 +103,14 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
 
   app.get("/api/state", async (c) => {
     const db = dbOf(c);
-    const [items, shipLog, events] = await Promise.all([
+    const [items, shipLog, events, workLinks, settings] = await Promise.all([
       db.query<Item>(`SELECT ${ITEM_COLS} FROM items`),
-      db.query<ShipLogEntry>("SELECT id, item_id, date::text AS date, metric, value, unit, note, source_url, created_at FROM ship_log ORDER BY date DESC, created_at DESC"),
+      db.query<ShipLogEntry>(`SELECT ${LOG_COLS} FROM ship_log ORDER BY date DESC, created_at DESC`),
       db.query<EventRow>("SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400"),
+      db.query<WorkLink>(`SELECT ${WORK_COLS} FROM work_links ORDER BY created_at DESC`),
+      readSettings(db),
     ]);
-    return c.json({ items, shipLog, events, meta: { demo: c.get("space").demo, writeKey: !cfg.resolve && Boolean(cfg.writeKey), now: new Date().toISOString(), ...c.get("space").meta } });
+    return c.json({ items, shipLog, events, workLinks, meta: { demo: c.get("space").demo, writeKey: !cfg.resolve && Boolean(cfg.writeKey), now: new Date().toISOString(), settings, ...c.get("space").meta } });
   });
 
   app.get("/api/health", async (c) => {
@@ -219,16 +246,88 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const result = await db.tx(async (q) => {
       const item = await one(q, c.req.param("id"));
       if (!item) return { error: bad("That item no longer exists.", 404) };
-      if (item.stage !== "live") return { error: bad("Results are logged against live items.", 409) };
+      if (!canLogResults(item.stage)) return { error: bad("Results are logged against items that are building or live.", 409) };
       const id = newId("sl");
       await q("INSERT INTO ship_log (id, item_id, date, metric, value, unit, note, source_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         [id, item.id, date, metric, value, unit, text(b.note) || null, source]);
       await q("UPDATE items SET updated_at = now() WHERE id = $1", [item.id]);
       await event(q, item.id, actor, "logged", `Logged ${metric}: ${value}${unit === "%" ? "%" : ` ${unit}`}`);
-      const [entry] = await q<ShipLogEntry>("SELECT id, item_id, date::text AS date, metric, value, unit, note, source_url, created_at FROM ship_log WHERE id = $1", [id]);
+      const [entry] = await q<ShipLogEntry>(`SELECT ${LOG_COLS} FROM ship_log WHERE id = $1`, [id]);
       return { entry };
     });
     return "error" in result ? result.error! : c.json({ entry: result.entry }, 201);
+  });
+
+  /* ----------------------------------------------------------- work links */
+
+  /** Asks GitHub once, briefly, what a pasted pull request is called and how it stands. Any failure leaves the pasted address as it is. */
+  const lookUpPullRequest = async (repo: string, number: number, token: string | undefined) => {
+    try {
+      const headers: Record<string, string> = { accept: "application/vnd.github+json", "user-agent": "gtm-backlog" };
+      if (token) headers.authorization = `Bearer ${token}`;
+      const res = await (cfg.fetch ?? fetch)(`https://api.github.com/repos/${repo}/pulls/${number}`, { headers, signal: AbortSignal.timeout(2500) });
+      return res.ok ? readPullRequest(await res.json()) : null;
+    } catch { return null; }
+  };
+
+  app.post("/api/items/:id/links", async (c) => {
+    const b = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const parsed = parseWorkLink(b.url);
+    if ("error" in parsed) return bad(parsed.error);
+    const given = text(b.title).slice(0, 200);
+    let { title, meta } = parsed, state: WorkLink["state"] = null;
+    if (parsed.kind === "pr") {
+      // The demo is open to everyone, so it never spends the real space's GitHub allowance.
+      const hit = c.get("space").demo ? null : await lookUpPullRequest(String(parsed.meta.repo), Number(parsed.meta.number), cfg.githubToken);
+      if (hit) { title = hit.title; state = hit.state; meta = { ...meta, ...hit.meta }; } // else: the address as pasted, state unknown
+    }
+    if (given && (parsed.kind === "session" || parsed.kind === "doc")) title = given;
+    const actor = c.get("actor");
+    const db = dbOf(c);
+    const result = await db.tx(async (q) => {
+      const item = await one(q, c.req.param("id"));
+      if (!item) return { error: bad("That item no longer exists.", 404) };
+      const [dup] = await q<{ id: string }>("SELECT id FROM work_links WHERE item_id = $1 AND url = $2", [item.id, parsed.url]);
+      if (dup) return { error: bad("That link is already on this item.", 409) };
+      const id = newId("wl");
+      await q("INSERT INTO work_links (id, item_id, kind, url, title, state, meta, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)",
+        [id, item.id, parsed.kind, parsed.url, title, state, JSON.stringify(meta), actor]);
+      await q("UPDATE items SET updated_at = now() WHERE id = $1", [item.id]);
+      await event(q, item.id, actor, "edited", `Linked ${kindWord(parsed.kind)}${parsed.kind === "pr" && meta.number ? ` #${meta.number}` : parsed.kind === "repo" || parsed.kind === "commit" ? ` ${title}` : ""}`);
+      const [link] = await q<WorkLink>(`SELECT ${WORK_COLS} FROM work_links WHERE id = $1`, [id]);
+      return { link };
+    });
+    return "error" in result ? result.error! : c.json({ link: result.link }, 201);
+  });
+
+  app.delete("/api/items/:id/links/:linkId", async (c) => {
+    const actor = c.get("actor");
+    const db = dbOf(c);
+    const result = await db.tx(async (q) => {
+      const [link] = await q<WorkLink>(`SELECT ${WORK_COLS} FROM work_links WHERE id = $1 AND item_id = $2`, [c.req.param("linkId"), c.req.param("id")]);
+      if (!link) return { error: bad("That link is already gone.", 404) };
+      await q("DELETE FROM work_links WHERE id = $1", [link.id]);
+      await q("UPDATE items SET updated_at = now() WHERE id = $1", [link.item_id]);
+      await event(q, link.item_id, actor, "edited", `Removed the ${kindWord(link.kind)} ${link.title}`);
+      return { ok: true };
+    });
+    return "error" in result ? result.error! : c.json({ ok: true });
+  });
+
+  /* ------------------------------------------------------------ settings */
+
+  app.put("/api/settings/:key", async (c) => {
+    const key = c.req.param("key");
+    const b = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const checked = checkSetting(key, b.value);
+    if ("error" in checked) return bad(checked.error, key === "accent" || key === "team_colors" ? 400 : 404);
+    const actor = c.get("actor");
+    const db = dbOf(c);
+    await db.tx(async (q) => {
+      await q("INSERT INTO settings (key, value, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", [key, JSON.stringify(checked.value)]);
+      await event(q, null, actor, "settings", key === "accent" ? `Set the accent colour to ${checked.value}` : "Changed the team colours");
+    });
+    return c.json({ key, value: checked.value, settings: await readSettings(db) });
   });
 
   app.all("/api/*", () => bad("No such endpoint.", 404));

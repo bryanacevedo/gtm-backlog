@@ -14,6 +14,8 @@
      underlined-action  a link, btn or button rule that underlines its text at rest (hover underlines excepted)
      explainer       a sub, hint, caption or note element (or a sub= prop) whose text is a sentence of five words or more
      type-sizes      a stylesheet that uses more than four distinct font sizes (avatar initials excepted)
+     literal-colour  a hex colour written into a rule of a stylesheet instead of a token: every colour is a custom property defined in a :root
+                     block, so the accent (a per-install setting) and the rest can change in one place. rgba() shadows and tints are not counted
      allow-reason    a `design-lint: allow` comment with no reason after it
 
    Exempt a line with the comment `design-lint: allow <reason>` (CSS or TSX), on the rule or tag, or on the line above it. The reason is required.
@@ -246,6 +248,24 @@ function lintCss(sheets, vars, allowFor, out, shapes) {
   }
 }
 
+// ---------- literal colours ----------
+// A hex colour belongs in a :root token block. Anywhere else it is a second copy that a change of accent would miss.
+function lintLiterals(sheets, allowFor, out) {
+  for (const { file, raw } of sheets) {
+    if (!file.endsWith(".css")) continue;
+    const ok = allowFor(file);
+    for (const b of parseCss(cssOf(file, raw))) {
+      if (/^(:root|html)\b/.test(b.selector)) continue;
+      if (isAllowed(ok, b.line, b.endLine)) continue;
+      for (const [k, v] of b.decls) {
+        if (k.startsWith("--")) continue;
+        const m = v.replace(/url\([^)]*\)/g, " ").match(/#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b/i);
+        if (m) { out.push({ file, line: b.line, rule: "literal-colour", snippet: squash(`${b.selector} { ${k}: ${v} }`) }); break; }
+      }
+    }
+  }
+}
+
 // ---------- type sizes ----------
 // Four sizes is the whole scale (T11). Avatar initials sit in a circle and are not type, so selectors naming an avatar are not counted.
 const SIZE_EXEMPT = /(^|[^a-z])(av|avatar)([^a-z]|$)/i;
@@ -367,6 +387,7 @@ export function lintFiles(files) {
   const shapes = new Map();
   lintCss(sheets, vars, (file) => allow.get(file), out, shapes);
   lintSizes(sheets, out);
+  lintLiterals(sheets, (file) => allow.get(file), out);
   for (const { f, rel, raw } of files) if (!f.endsWith(".css")) lintMarkup(rel, raw, allow.get(rel), out, shapes);
   return out.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.rule.localeCompare(b.rule));
 }

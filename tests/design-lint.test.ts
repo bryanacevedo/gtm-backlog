@@ -51,6 +51,14 @@ describe("the rules a script can check", () => {
     expect(tsx(`export const A = () => <p className="hint">Nothing to decide.</p>;`)).not.toContain("explainer");
   });
 
+  it("literal-colour: a hex colour in a rule instead of a token", () => {
+    expect(css(`.btn.primary { background: #18181B; color: #fff; }`)).toContain("literal-colour");
+    expect(css(`.toast { box-shadow: inset 0 0 0 1px #1a1a1a; }`)).toContain("literal-colour");
+    expect(css(`:root { --accent: #18181B; --accent-ink: #FAFAFA; } .btn.primary { background: var(--accent); color: var(--accent-ink); }`)).not.toContain("literal-colour");
+    expect(css(`.mini { box-shadow: 0 0 0 1px rgba(9, 9, 11, 0.08); } .select { background-image: url("data:image/svg+xml,%3Csvg stroke='%2371717A'/%3E"); }`)).not.toContain("literal-colour");
+    expect(css(`/* design-lint: allow a brand mark has its own fixed colour */\n.logo { fill: #E4572E; }`)).not.toContain("literal-colour");
+  });
+
   it("type-sizes: more than four font sizes in one stylesheet", () => {
     const five = `a{font:400 12px/18px x} b{font:400 13px/19px x} c{font-size:14px} d{font:600 20px/26px x} e{font-size:11px}`;
     expect(css(five)).toContain("type-sizes");

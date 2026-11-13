@@ -1,15 +1,16 @@
 /* The sample backlog has to agree with itself on screen: "since" on an item page is stage_changed_at, and the
    activity feed beside it must show the same day for the move that put the item there. */
-import { readFileSync } from "node:fs";
+import { allMigrations } from "./migrations";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate, pglite, type Db } from "../src/server/db";
 import { seedSql } from "../src/server/seed";
-import { TEAMS, teamsOf } from "../src/shared/domain";
+import { TEAMS, canLogResults, teamsOf, type Stage } from "../src/shared/domain";
+import { parseWorkLink } from "../src/shared/work";
 
 let db: Db;
 beforeAll(async () => {
   db = await pglite();
-  await migrate(db, [{ name: "0001_init.sql", sql: readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8") }]);
+  await migrate(db, allMigrations());
   await db.exec(seedSql());
 });
 afterAll(() => db.close());
@@ -35,6 +36,42 @@ describe("the sample data", () => {
     const rows = await db.query<{ metric: string }>("SELECT metric FROM ship_log");
     expect(rows.length).toBeGreaterThan(0);
     for (const { metric } of rows) expect(metric).toMatch(/^[A-Z]/);
+  });
+});
+
+describe("the sample work", () => {
+  it("gives every building and live item a repo, pull requests and sessions, all links the recogniser reads the same way", async () => {
+    const rows = await db.query<{ item_id: string; stage: string; kind: string; url: string; state: string | null }>(
+      "SELECT w.item_id, i.stage::text AS stage, w.kind, w.url, w.state FROM work_links w JOIN items i ON i.id = w.item_id");
+    const byItem = new Map<string, typeof rows>();
+    for (const r of rows) byItem.set(r.item_id, [...(byItem.get(r.item_id) ?? []), r]);
+    const stages = await db.query<{ id: string; stage: string; live_at: string | null }>("SELECT id, stage::text AS stage, live_at FROM items WHERE stage IN ('building', 'live')");
+    expect(stages.length).toBeGreaterThanOrEqual(8);
+    for (const i of stages) {
+      const links = byItem.get(i.id) ?? [];
+      expect(links.some((l) => l.kind === "session"), `${i.id} has a session`).toBe(true);
+      expect(links.some((l) => l.kind === "pr" || l.kind === "doc"), `${i.id} has a pull request or doc`).toBe(true);
+    }
+    for (const l of rows) {
+      const p = parseWorkLink(l.url);
+      expect("error" in p ? p.error : p.kind, l.url).toBe(l.kind === "repo" ? "repo" : l.kind);
+      expect(l.state === null || ["open", "merged", "closed"].includes(l.state)).toBe(true);
+    }
+    expect(rows.some((l) => l.state === "open")).toBe(true);
+    expect(rows.some((l) => l.state === "merged")).toBe(true);
+  });
+
+  it("logs results only against items that may have them, and the building items have some", async () => {
+    const rows = await db.query<{ stage: Stage }>("SELECT DISTINCT i.stage::text AS stage FROM ship_log s JOIN items i ON i.id = s.item_id");
+    expect(rows.length).toBeGreaterThan(1);
+    for (const r of rows) expect(canLogResults(r.stage) || r.stage === "retired", r.stage).toBe(true);
+    expect(rows.map((r) => r.stage)).toContain("building");
+  });
+
+  it("starts with no stored settings, whatever a visitor changed before the reload", async () => {
+    await db.query("INSERT INTO settings (key, value) VALUES ('accent', '\"#C2410C\"') ON CONFLICT (key) DO NOTHING");
+    await db.exec(seedSql());
+    expect((await db.query("SELECT 1 FROM settings")).length).toBe(0);
   });
 });
 
