@@ -10,8 +10,14 @@ export const FLOW: Stage[] = ["idea", "building", "live"];
 /** What the Queue ranks: work that is wanted but not shipped. */
 export const OPEN: Stage[] = ["idea", "building"];
 
-export const TEAMS = ["Sales", "SDR", "Marketing", "Field Marketing", "Demand Gen", "RevOps", "Partnerships", "Customer Success"] as const;
+export const TEAMS = ["Sales", "SDR", "Marketing", "Field Marketing", "Demand Gen", "RevOps", "Partnerships", "Customer Success", "Ways of working"] as const;
 export type Team = (typeof TEAMS)[number];
+
+/** The teams to offer: the known ones in their order, then any other team that already has an item (the real backlog can hold more). */
+export function teamsOf(items: { team: string }[]): string[] {
+  const extra = [...new Set(items.map((i) => i.team))].filter((t) => !(TEAMS as readonly string[]).includes(t)).sort();
+  return [...TEAMS, ...extra];
+}
 
 /** What a request touches. Used to explain impact, not to compute it. */
 export const TOUCHES = ["pipeline", "meetings", "data quality", "speed", "reporting"] as const;

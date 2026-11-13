@@ -38,7 +38,17 @@ export interface AuthConfig {
   secure: boolean;
 }
 
-export interface Session { sub: string; email: string; name: string; hd?: string; exp: number }
+export interface Session { sub: string; email: string; name: string; hd?: string; picture?: string; exp: number }
+
+/** The profile photo from Google's ID token, kept only if it is a plain https URL of a sane length. Anything else is dropped,
+    so the browser is never handed a script, data or http address to load. */
+export function cleanPicture(v: unknown): string | undefined {
+  if (typeof v !== "string" || v.length === 0 || v.length > 400 || /[\s\x00-\x1f\x7f]/.test(v)) return undefined;
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" && !u.username && !u.password && u.hostname.includes(".") ? u.href : undefined;
+  } catch { return undefined; }
+}
 
 /** Reads the sign-in settings. `config` is null (demo-only) unless every required one is present and valid;
     `problems` explains a half-finished setup so the log says what is missing. */
@@ -153,7 +163,7 @@ export function jwksCache(deps: GoogleDeps) {
   };
 }
 
-export interface Identity { sub: string; email: string; name: string; hd?: string }
+export interface Identity { sub: string; email: string; name: string; hd?: string; picture?: string }
 
 /** Checks an ID token end to end and returns who it says the user is. Throws SignInError with a plain message. */
 export async function verifyIdToken(idToken: string, cfg: AuthConfig, nonce: string, deps: GoogleDeps, jwks: ReturnType<typeof jwksCache>): Promise<Identity> {
@@ -175,7 +185,7 @@ export async function verifyIdToken(idToken: string, cfg: AuthConfig, nonce: str
   if (typeof payload.nonce !== "string" || !safeEqual(payload.nonce, nonce)) throw new SignInError("That sign-in did not start here. Start again.", 400);
   if (payload.email_verified !== true) throw new SignInError("Google has not verified that email address.", 403);
   const email = String(payload.email).trim().toLowerCase();
-  return { sub: String(payload.sub), email, hd: typeof payload.hd === "string" ? payload.hd : undefined, name: typeof payload.name === "string" && payload.name.trim() ? payload.name.trim().slice(0, 60) : email.split("@")[0] };
+  return { sub: String(payload.sub), email, hd: typeof payload.hd === "string" ? payload.hd : undefined, picture: cleanPicture(payload.picture), name: typeof payload.name === "string" && payload.name.trim() ? payload.name.trim().slice(0, 60) : email.split("@")[0] };
 }
 
 async function exchangeCode(code: string, verifier: string, cfg: AuthConfig, deps: GoogleDeps): Promise<string> {
@@ -264,7 +274,7 @@ export function mountAuth(app: Hono<any>, d: AuthDeps) {
       return fail(e instanceof SignInError ? e.message : "Could not finish signing in with Google. Try again in a minute.", e instanceof SignInError ? e.status : 502);
     }
     if (!isAllowed(cfg, who.email, who.hd)) return fail(`${who.email} does not have access to this backlog. Sign in with another Google account, or try the demo.`, 403);
-    setCookie(c, names.session, sign(cfg.sessionSecret, "session", { sub: who.sub, email: who.email, name: who.name, hd: who.hd, exp: nowSec() + SESSION_SECONDS }), cookieOpts(cfg, SESSION_SECONDS));
+    setCookie(c, names.session, sign(cfg.sessionSecret, "session", { sub: who.sub, email: who.email, name: who.name, hd: who.hd, picture: who.picture, exp: nowSec() + SESSION_SECONDS }), cookieOpts(cfg, SESSION_SECONDS));
     deleteCookie(c, names.space, { path: "/", secure: cfg.secure });
     return redirect(c, "/");
   });

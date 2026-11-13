@@ -224,7 +224,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       await q("INSERT INTO ship_log (id, item_id, date, metric, value, unit, note, source_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         [id, item.id, date, metric, value, unit, text(b.note) || null, source]);
       await q("UPDATE items SET updated_at = now() WHERE id = $1", [item.id]);
-      await event(q, item.id, actor, "logged", `Logged ${value}${unit === "%" ? "%" : ` ${unit}`} ${metric}`);
+      await event(q, item.id, actor, "logged", `Logged ${metric}: ${value}${unit === "%" ? "%" : ` ${unit}`}`);
       const [entry] = await q<ShipLogEntry>("SELECT id, item_id, date::text AS date, metric, value, unit, note, source_url, created_at FROM ship_log WHERE id = $1", [id]);
       return { entry };
     });

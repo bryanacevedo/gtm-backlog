@@ -10,7 +10,7 @@
 
 import { Hono, type Context } from "hono";
 import { createApp, type Space } from "./app.ts";
-import { crossSite, mountAuth, renderSignin, safeEqual, sessionFrom, viewingDemo, type AuthConfig } from "./auth.ts";
+import { cleanPicture, crossSite, mountAuth, renderSignin, safeEqual, sessionFrom, viewingDemo, type AuthConfig } from "./auth.ts";
 import type { Db } from "./db.ts";
 
 export interface HostedDeps {
@@ -63,9 +63,9 @@ export function createHosted(d: HostedDeps) {
     if (user && !viewingDemo(c, auth)) {
       if (c.req.method !== "GET" && crossSite(c, auth)) return refuse("That request came from another site, so it was not made.", 403);
       const db = await real();
-      return db instanceof Response ? db : { db, demo: false, actor: user.name, meta: { ...meta, space: "real", user: { name: user.name, email: user.email } } };
+      return db instanceof Response ? db : { db, demo: false, actor: user.name, meta: { ...meta, space: "real", user: { name: user.name, email: user.email, picture: cleanPicture(user.picture) } } };
     }
-    return { db: d.demoDb, demo: true, meta: { ...meta, space: "demo", user: user ? { name: user.name, email: user.email } : null } };
+    return { db: d.demoDb, demo: true, meta: { ...meta, space: "demo", user: user ? { name: user.name, email: user.email, picture: cleanPicture(user.picture) } : null } };
   };
 
   app.route("/", createApp(() => d.demoDb, { writeKey: d.writeKey, demo: true, resolve }));

@@ -6,7 +6,7 @@ type Row = {
   title: string; problem: string; team: string; requester: string; touches: string[];
   stage: "triage" | "idea" | "building" | "live" | "declined" | "retired";
   owner?: string; impact?: number; reach?: number; confidence?: number; effort?: number;
-  scoredDaysAgo?: number; createdDaysAgo: number; stageDaysAgo: number; liveDaysAgo?: number;
+  scoredDaysAgo?: number; createdDaysAgo: number; stageDaysAgo: number; liveDaysAgo?: number; acceptDaysAgo?: number;
   system?: string; note?: string; target?: number; link?: string;
   log?: { daysAgo: number; metric: string; value: number; unit: string; note?: string }[];
 };
@@ -36,13 +36,13 @@ const rows: Row[] = [
 
   // ---- live (shipped, with results)
   { title: "Reply classification for outbound", problem: "Reps read every reply to find the few interested ones. Out-of-office and unsubscribe replies bury the hot leads.", team: "SDR", requester: "Marcus Bell", touches: ["speed", "meetings"], stage: "live", owner: "Lena Fischer", impact: 4, reach: 200, confidence: 80, effort: 7, scoredDaysAgo: 80, createdDaysAgo: 96, stageDaysAgo: 52, liveDaysAgo: 52, system: "https://github.com/example/reply-classifier",
-    log: [{ daysAgo: 45, metric: "of replies sorted automatically", value: 91, unit: "%" }, { daysAgo: 16, metric: "of rep time saved per week", value: 11, unit: "hours", note: "Measured across the SDR team over two weeks." }] },
+    log: [{ daysAgo: 45, metric: "Replies sorted automatically", value: 91, unit: "%" }, { daysAgo: 16, metric: "Rep time saved per week", value: 11, unit: "hours", note: "Measured across the SDR team over two weeks." }] },
   { title: "Demo request routing", problem: "Demo requests landed in a shared inbox and waited for whoever looked first.", team: "SDR", requester: "Jordan Pike", touches: ["speed", "meetings"], stage: "live", owner: "Sam Ortiz", impact: 4, reach: 35, confidence: 100, effort: 3, scoredDaysAgo: 70, createdDaysAgo: 75, stageDaysAgo: 41, liveDaysAgo: 41, system: "https://example.com/workflows/demo-routing",
-    log: [{ daysAgo: 30, metric: "median time to first touch", value: 14, unit: "min", note: "Down from about a day." }, { daysAgo: 8, metric: "booked from demo requests", value: 23, unit: "meetings" }] },
+    log: [{ daysAgo: 30, metric: "Median time to first touch", value: 14, unit: "min", note: "Down from about a day." }, { daysAgo: 8, metric: "Meetings booked from demo requests", value: 23, unit: "meetings" }] },
   { title: "Weekly pipeline digest", problem: "The Monday pipeline review starts with ten minutes of pulling numbers.", team: "RevOps", requester: "Dana Whitfield", touches: ["reporting"], stage: "live", owner: "Lena Fischer", impact: 2, reach: 400, confidence: 100, effort: 2, scoredDaysAgo: 98, createdDaysAgo: 110, stageDaysAgo: 88, liveDaysAgo: 88, system: "https://example.com/dashboards/pipeline",
-    log: [{ daysAgo: 70, metric: "read it every week", value: 6, unit: "leaders" }] },
+    log: [{ daysAgo: 70, metric: "Leaders reading it weekly", value: 6, unit: "leaders" }] },
   { title: "Bounced email cleanup", problem: "Hard bounces stayed in sequences and hurt sender reputation.", team: "Marketing", requester: "Hannah Cole", touches: ["data quality"], stage: "live", owner: "Sam Ortiz", impact: 3, reach: 300, confidence: 100, effort: 2, scoredDaysAgo: 30, createdDaysAgo: 36, stageDaysAgo: 5, liveDaysAgo: 5, system: "https://github.com/example/bounce-cleanup",
-    log: [{ daysAgo: 2, metric: "bounce rate", value: 1.2, unit: "%", note: "From 4.8% the month before." }] },
+    log: [{ daysAgo: 2, metric: "Bounce rate", value: 1.2, unit: "%", note: "From 4.8% the month before." }] },
   { title: "Partner-sourced deal tagging", problem: "Partner-sourced deals were not tagged, so partners got no credit.", team: "Partnerships", requester: "Tomás Rivera", touches: ["reporting"], stage: "live", owner: "Lena Fischer", impact: 3, reach: 10, confidence: 80, effort: 1, scoredDaysAgo: 40, createdDaysAgo: 44, stageDaysAgo: 34, liveDaysAgo: 34, system: "https://example.com/crm/partner-tagging" },
 
   // ---- declined and retired
@@ -77,13 +77,17 @@ export function seedSql(nowMs: number = Date.now()): string {
       iso(r.createdDaysAgo, 9), iso(Math.min(r.stageDaysAgo, r.scoredDaysAgo ?? 999, r.log?.at(-1)?.daysAgo ?? 999), 16), iso(r.stageDaysAgo, 16),
     ].map(q).join(", ")});`);
     addEvent(id(i), r.createdDaysAgo, r.requester, "created", "Submitted the request");
-    if (r.stage !== "triage") addEvent(id(i), Math.max(r.stageDaysAgo, r.createdDaysAgo - 1), "Sam Ortiz", "triaged", r.stage === "declined" ? (merged ? "Merged" : "Declined") : "Accepted into Idea");
-    if (r.stage === "building" || r.stage === "live" || r.stage === "retired") addEvent(id(i), r.liveDaysAgo != null ? r.liveDaysAgo + 3 : r.stageDaysAgo, r.owner ?? "Sam Ortiz", "moved", "Idea → Building");
+    // The triage decision is dated to match "since" on the item page: an idea or a declined request was decided the day it entered its stage.
+    // Items that went on to be built were accepted a little before the build move, never before they were requested.
+    const buildDaysAgo = r.liveDaysAgo != null ? r.liveDaysAgo + 3 : r.stageDaysAgo;
+    const decidedDaysAgo = r.stage === "idea" || r.stage === "declined" ? r.stageDaysAgo : r.acceptDaysAgo ?? Math.min(r.createdDaysAgo, buildDaysAgo + 2);
+    if (r.stage !== "triage") addEvent(id(i), decidedDaysAgo, "Sam Ortiz", "triaged", r.stage === "declined" ? (merged ? "Merged" : "Declined") : "Accepted into Idea");
+    if (r.stage === "building" || r.stage === "live" || r.stage === "retired") addEvent(id(i), buildDaysAgo, r.owner ?? "Sam Ortiz", "moved", "Idea → Building");
     if (r.liveDaysAgo != null) addEvent(id(i), r.liveDaysAgo, r.owner ?? "Sam Ortiz", "moved", "Building → Live");
     if (r.stage === "retired") addEvent(id(i), r.stageDaysAgo, r.owner ?? "Sam Ortiz", "moved", "Live → Retired");
     for (const l of r.log ?? []) {
       out.push(`INSERT INTO ship_log VALUES (${[`sl_${++lg}`, id(i), day(l.daysAgo), l.metric, l.value, l.unit, l.note ?? null, r.system ?? null, iso(l.daysAgo, 17)].map(q).join(", ")});`);
-      addEvent(id(i), l.daysAgo, r.owner ?? "Sam Ortiz", "logged", `Logged ${l.value}${l.unit === "%" ? "%" : ` ${l.unit}`} ${l.metric}`);
+      addEvent(id(i), l.daysAgo, r.owner ?? "Sam Ortiz", "logged", `Logged ${l.metric}: ${l.value}${l.unit === "%" ? "%" : ` ${l.unit}`}`);
     }
   });
   

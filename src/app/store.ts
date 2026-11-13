@@ -9,7 +9,7 @@ export interface Snapshot {
   items: Item[];
   shipLog: ShipLogEntry[];
   events: EventRow[];
-  meta: { demo: boolean; writeKey: boolean; now: string; space?: "demo" | "real"; user?: { name: string; email: string } | null; signIn?: boolean };
+  meta: { demo: boolean; writeKey: boolean; now: string; space?: "demo" | "real"; user?: { name: string; email: string; picture?: string } | null; signIn?: boolean };
 }
 
 export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void }

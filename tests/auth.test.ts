@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { SignJWT, exportJWK, generateKeyPair, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authConfigFromEnv, isAllowed, sign, SESSION_SECONDS, type AuthConfig } from "../src/server/auth";
+import { authConfigFromEnv, cleanPicture, isAllowed, sign, SESSION_SECONDS, type AuthConfig } from "../src/server/auth";
 import { migrate, pglite, type Db } from "../src/server/db";
 import { createHosted } from "../src/server/hosted";
 
@@ -179,6 +179,42 @@ describe("the allowlist", () => {
     expect(isAllowed(cfg, "a@team.test")).toBe(false);
     expect(isAllowed(cfg, "@team.test")).toBe(false);
     expect(isAllowed(cfg, "")).toBe(false);
+  });
+});
+
+describe("the profile photo", () => {
+  type State = { meta: { user: { name: string; picture?: string } } };
+  const stateFor = async (cookies: Record<string, string>) => ((await (await get("/api/state", cookies)).json()) as State).meta.user;
+
+  it("keeps an https picture from Google's token and shows it in meta.user", async () => {
+    const picture = "https://lh3.googleusercontent.com/a/ACg8oc=s96-c";
+    const { res, cookies } = await signIn({ claims: { picture } });
+    expect(res.status).toBe(303);
+    expect(await stateFor(cookies)).toMatchObject({ name: "Bryan A", picture });
+  });
+
+  it("signs in without a photo when the token has none", async () => {
+    const { res, cookies } = await signIn({});
+    expect(res.status).toBe(303);
+    expect((await stateFor(cookies)).picture).toBeUndefined();
+  });
+
+  it("drops a picture that is not https, still signs the user in, and never passes it on", async () => {
+    for (const picture of ["http://lh3.googleusercontent.com/a/x", "javascript:alert(1)", "data:image/png;base64,AAAA", "//lh3.googleusercontent.com/a/x", "https://user:pw@lh3.googleusercontent.com/a/x", `https://lh3.googleusercontent.com/${"a".repeat(500)}`]) {
+      const { res, cookies } = await signIn({ claims: { picture } });
+      expect(res.status, picture.slice(0, 40)).toBe(303);
+      expect((await stateFor(cookies)).picture, picture.slice(0, 40)).toBeUndefined();
+    }
+  });
+
+  it("validates a stored session's picture again before handing it to the page", async () => {
+    const bad = { [SESSION]: sign(SECRET, "session", { sub: "g-1", email: "bryan@example.com", name: "Bryan A", picture: "http://evil.test/x.png", exp: Math.floor(Date.now() / 1000) + 600 }) };
+    expect((await stateFor(bad)).picture).toBeUndefined();
+  });
+
+  it("cleanPicture accepts https and rejects everything else", () => {
+    expect(cleanPicture("https://lh3.googleusercontent.com/a/x=s96-c")).toBe("https://lh3.googleusercontent.com/a/x=s96-c");
+    for (const v of ["http://a.test/x", "ftp://a.test/x", "https://", "not a url", "https://a.test/a b", "", 42, null, undefined]) expect(cleanPicture(v), String(v)).toBeUndefined();
   });
 });
 
