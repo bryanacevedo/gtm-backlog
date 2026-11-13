@@ -13,7 +13,8 @@
     "test": "vitest run",
     "deploy": "vite build && wrangler deploy",
     "start": "node src/server/node.ts",
-    "migrate": "node src/server/node.ts --migrate"
+    "migrate": "node src/server/node.ts --migrate",
+    "demo:snapshot": "node scripts/demo-snapshot.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",

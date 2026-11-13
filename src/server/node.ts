@@ -10,7 +10,8 @@
 
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { createReadStream, existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { Readable } from "node:stream";
 import { createApp } from "./app.ts";
@@ -25,8 +26,15 @@ const migrateOnly = process.argv.includes("--migrate");
 const url = demo ? undefined : process.env.DATABASE_URL;
 
 if (migrateOnly && !url) { console.error("--migrate needs DATABASE_URL."); process.exit(1); }
-if (demo) rmSync(join(root, ".data"), { recursive: true, force: true });
-const db: Db = url ? await postgresJs(url) : await pglite(join(root, ".data"));
+// The demo gets its own folder, so `make demo` never wipes a local non-demo database.
+const dataDir = join(root, ".data", demo ? "demo" : "local");
+if (demo) rmSync(dataDir, { recursive: true, force: true });
+mkdirSync(dataDir, { recursive: true });
+// Creating a Postgres data folder from nothing takes about 900 MB, more than the free Render plan has.
+// The hosted demo opens a copy made ahead of time (npm run demo:snapshot); the sample is reloaded over it.
+const snapshot = join(root, "samples", "demo-snapshot.tgz");
+if (demo && process.env.PUBLIC_DEMO === "1" && existsSync(snapshot)) execFileSync("tar", ["xzf", snapshot, "-C", join(root, ".data")]);
+const db: Db = url ? await postgresJs(url) : await pglite(dataDir);
 
 const migrations = readdirSync(join(root, "migrations")).filter((f) => f.endsWith(".sql"))
   .map((name) => ({ name, sql: readFileSync(join(root, "migrations", name), "utf8") }));
