@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { OPEN, TEAMS } from "../shared/domain";
+import { OPEN, teamsOf } from "../shared/domain";
 import { MoveDialog, NewRequest, type PendingMove } from "./forms";
 import { isTyping, linkClick, navigate, parseRoute, useLocation } from "./lib";
 import { actorPrompt, load, setActor, useStore } from "./store";
@@ -16,6 +16,9 @@ const NAV = [
   { key: "3", view: "board", path: "/board", name: "Board", icon: Icon.board },
   { key: "4", view: "shipped", path: "/shipped", name: "Shipped", icon: Icon.ship },
 ] as const;
+
+/* The rail button is the page's primary action only on views that have none of their own. */
+const NEW_IS_PRIMARY = ["queue", "board", "shipped"];
 
 export interface Shared { openNew: () => void; requestMove: (p: PendingMove) => void }
 
@@ -43,7 +46,7 @@ export function App() {
       queue: items.filter((i) => OPEN.includes(i.stage)).length,
       board: items.filter((i) => ["idea", "building", "live"].includes(i.stage)).length,
       shipped: items.filter((i) => i.live_at).length,
-      teams: TEAMS.map((t) => [t, items.filter((i) => OPEN.includes(i.stage) && i.team === t).length] as const).filter(([, n]) => n > 0),
+      teams: teamsOf(items).map((t) => [t, items.filter((i) => OPEN.includes(i.stage) && i.team === t).length] as const).filter(([, n]) => n > 0),
     };
   }, [data]);
 
@@ -81,7 +84,7 @@ export function App() {
       <a className="sr-only" href="#main">Skip to content</a>
       <nav className="rail" aria-label="Workspace">
         <div className="ws"><span className="ws-mark" aria-hidden="true"><i /></span>{meta?.space === "real" ? "GTM Backlog" : "Acme GTM"}{meta?.demo && <span className="env">Demo</span>}</div>
-        <button className="new-btn" type="button" onClick={openNew} aria-label="New request"><Icon.plus /><span>New request</span><kbd>C</kbd></button>
+        <button className={`new-btn${NEW_IS_PRIMARY.includes(route.view) ? " primary" : ""}`} type="button" onClick={openNew} aria-label="New request"><Icon.plus /><span className="long">New request</span><span className="short">New</span><kbd>C</kbd></button>
         {NAV.map((n) => (
           <a key={n.view} href={n.path} className="nav-link" aria-current={route.view === n.view && !(n.view === "queue" && activeTeam) ? "page" : undefined} onClick={linkClick(n.path)}>
             <n.icon /><span>{n.name}</span>
@@ -90,9 +93,10 @@ export function App() {
         ))}
         {counts.teams.length > 0 && <div className="rail-group">Teams</div>}
         {counts.teams.map(([t, n]) => {
-          const to = `/?team=${encodeURIComponent(t)}`;
+          const active = route.view === "queue" && activeTeam === t;
+          const to = active ? "/" : `/?team=${encodeURIComponent(t)}`; // the selected team is the filter; picking it again clears it
           return (
-            <a key={t} href={to} className="team-link" aria-current={route.view === "queue" && activeTeam === t ? "true" : undefined} onClick={linkClick(to)}>
+            <a key={t} href={to} className="team-link" aria-current={active ? "true" : undefined} onClick={linkClick(to)}>
               <Team name={t} /><span className="count">{n}</span>
             </a>
           );
@@ -100,13 +104,15 @@ export function App() {
         <div className="rail-foot">
           {meta?.demo && <span className="env env-phone">Demo</span>}
           {meta?.space === "real" && meta.user ? (
-            <div className="me fixed"><Avatar name={meta.user.name} size="sm" /><span>{meta.user.name}</span></div>
-          ) : (
+            <div className="me fixed"><Avatar name={meta.user.name} size="sm" src={meta.user.picture} /><span>{meta.user.name}</span></div>
+          ) : actor ? (
             <button className="me" type="button" onClick={() => setNameEditing(true)}>
               <Avatar name={actor} size="sm" />
-              <span>{actor ?? "Add your name"}</span>
-              <span className="hint">{actor ? "Change" : ""}</span>
+              <span>{actor}</span>
+              <span className="hint">Change</span>
             </button>
+          ) : (
+            <button className="btn quiet compact add-name" type="button" onClick={() => setNameEditing(true)}>Add your name</button>
           )}
           {(meta?.user || meta?.signIn) && (
             <div className="acct">
@@ -143,7 +149,7 @@ export function App() {
       {pending && <MoveDialog pending={pending} onClose={() => setPending(null)} />}
       {(actorPrompt.open || nameEditing) && <NameDialog initial={actor ?? ""} onDone={(n) => { setNameEditing(false); setActor(n); }} />}
       {keysOpen && (
-        <Dialog title="Keyboard shortcuts" onClose={() => setKeysOpen(false)}>
+        <Dialog title="Keyboard shortcuts" onClose={() => setKeysOpen(false)} closeButton>
           <div className="keys-table">
             {([
               [["1", "2", "3", "4"], "Triage, Queue, Board, Shipped"], [["j", "k"], "Next and previous"],
@@ -174,10 +180,10 @@ function AuthButton({ action, field, children }: { action: string; field?: Recor
 function NameDialog({ initial, onDone }: { initial: string; onDone: (n: string | null) => void }) {
   const [name, setName] = useState(initial);
   return (
-    <Dialog title="Who is making changes?" sub="Your name goes on the activity log next to what you change. It stays in this browser." onClose={() => onDone(null)}>
+    <Dialog title="Who is making changes?" onClose={() => onDone(null)}>
       <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onDone(name.trim()); }} style={{ display: "grid", gap: 16 }}>
         <div className="field">
-          <label htmlFor="who-name">Your name</label>
+          <label htmlFor="who-name">Your name (goes on the activity log)</label>
           <input id="who-name" className="input" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Moreno" />
         </div>
         <div className="dialog-foot">

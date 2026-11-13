@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { isSilent, type Item, type ShipLogEntry } from "../../shared/domain";
 import { daysSince, fmtDay, fmtMonth, fmtNum, linkClick, plural } from "../lib";
 import { useStore } from "../store";
-import { Avatar, Empty, StageLabel, Team } from "../ui";
+import { Avatar, Empty, Icon, StageLabel, Team } from "../ui";
 
 export function Shipped() {
   const data = useStore((s) => s.data)!;
@@ -36,14 +36,14 @@ export function Shipped() {
       </header>
 
       <div className="meters" role="group" aria-label="Summary">
-        <Meter label="Shipped this month" fig={meters.thisMonth} note={fmtMonth(now.toISOString())} />
-        <Meter label="Running now" fig={meters.live} note="live systems" />
-        <Meter label="Silent" fig={meters.silent} note="live, no result in 30 days" warn={meters.silent > 0} />
-        <Meter label="Results logged" fig={meters.results30} note="in the last 30 days" />
+        <Meter label={`Shipped in ${fmtMonth(now.toISOString()).split(" ")[0]}`} fig={meters.thisMonth} />
+        <Meter label="Live" fig={meters.live} />
+        <Meter label="Silent" fig={meters.silent} attn={meters.silent > 0} />
+        <Meter label="Results, last 30 days" fig={meters.results30} />
       </div>
 
       {months.length === 0 ? (
-        <Empty>Nothing has shipped yet. Items appear here the day they go live, with their results underneath.</Empty>
+        <Empty>Nothing shipped yet.</Empty>
       ) : months.map(([key, items]) => (
         <section className="month" key={key} aria-labelledby={`m-${key}`}>
           <div className="month-head"><h2 id={`m-${key}`}>{fmtMonth(key + "-01")}</h2><span className="n">{plural(items.length, "release")}</span></div>
@@ -54,12 +54,11 @@ export function Shipped() {
   );
 }
 
-function Meter({ label, fig, note, warn }: { label: string; fig: number; note: string; warn?: boolean }) {
+function Meter({ label, fig, attn }: { label: string; fig: number; attn?: boolean }) {
   return (
     <div className="meter">
       <span className="label">{label}</span>
-      <span className="fig" style={warn ? { color: "var(--warn)" } : undefined}>{fig}</span>
-      <span className="note">{note}</span>
+      <span className={`fig${attn ? " attn" : ""}`}>{fig}</span>
     </div>
   );
 }
@@ -72,16 +71,20 @@ function ShipRow({ item, log, now }: { item: Item; log: ShipLogEntry[]; now: Dat
     <div className="ship-row">
       <div className="what">
         <a className="t" href={href} onClick={linkClick(href)}>{item.title}</a>
-        <span className="by"><Avatar name={item.owner} size="sm" /> {item.owner ?? "GTM team"} for <Team name={item.team} />{item.system_url && <> · <a className="link" href={item.system_url} target="_blank" rel="noreferrer">System</a></>}</span>
+        <span className="by"><Avatar name={item.owner} size="sm" /> {item.owner ?? "GTM team"} for <Team name={item.team} /></span>
       </div>
       <div className="res">
         {latest ? (<>
-          <span><span className="v">{fmtNum(latest.value)}{latest.unit === "%" ? "%" : ` ${latest.unit}`}</span> {latest.metric}</span>
+          <span className="m">{latest.metric}</span>
+          <span className="v">{fmtNum(latest.value)}<span className="u">{latest.unit === "%" ? "%" : ` ${latest.unit}`}</span></span>
           <span className="d">Measured {fmtDay(latest.date, now)}{log.length > 1 ? ` · ${plural(log.length, "result")} logged` : ""}</span>
         </>) : <span className="d">{item.stage === "retired" ? "No results were logged." : "No result logged yet."}</span>}
-        {(silent || item.stage === "retired") && <StageLabel stage={item.stage} silent={silent} />}
+        {(silent || item.stage === "retired") && <span className="st"><StageLabel stage={item.stage} silent={silent} /></span>}
       </div>
-      <div className="when">{fmtDay(item.live_at!, now)}</div>
+      <div className="when">
+        <span>{fmtDay(item.live_at!, now)}</span>
+        {item.system_url && <a className="btn icon" href={item.system_url} target="_blank" rel="noreferrer" aria-label={`Open the system for ${item.title}`} title="Open the system"><Icon.external /></a>}
+      </div>
     </div>
   );
 }

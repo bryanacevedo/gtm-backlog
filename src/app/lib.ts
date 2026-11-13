@@ -76,8 +76,8 @@ export function ago(iso: string, now = new Date()) {
   const d = daysSince(iso, now);
   return d === 0 ? "today" : d === 1 ? "1 day ago" : `${d} days ago`;
 }
-/** Compact form for table cells: "3d". */
-export const agoShort = (iso: string, now = new Date()) => `${daysSince(iso, now)}d`;
+/** Compact form for table cells: "3d", or "today" for a change made today. */
+export const agoShort = (iso: string, now = new Date()) => { const d = daysSince(iso, now); return d === 0 ? "today" : `${d}d`; };
 
 export const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { OPEN, isScoreStale, rank, score, type Item } from "../../shared/domain";
+import { OPEN, isScoreStale, rank, score, teamsOf, type Item } from "../../shared/domain";
 import type { Shared } from "../App";
-import { agoShort, daysSince, fmtNum, fmtScore, linkClick, navigate, plural, useQueryParam } from "../lib";
+import { agoShort, daysSince, fmtNum, fmtScore, linkClick, navigate, useQueryParam } from "../lib";
 import { useRowFocus } from "../rows";
 import { useStore } from "../store";
-import { Avatar, Empty, Icon, StageLabel, Team } from "../ui";
+import { Avatar, Empty, StageLabel, Team } from "../ui";
 
 export function Queue({ shared }: { shared: Shared }) {
   const data = useStore((s) => s.data)!;
@@ -16,6 +16,7 @@ export function Queue({ shared }: { shared: Shared }) {
   const shown = team ? open.filter((i) => i.team === team) : open;
   const building = shown.filter((i) => i.stage === "building").length;
   const unscored = shown.filter((i) => score(i) == null).length;
+  const teams = useMemo(() => teamsOf(open).filter((t) => open.some((i) => i.team === t)), [open]);
   const [focus, setFocus] = useRowFocus(shown.map((i) => i.id));
 
   return (
@@ -23,19 +24,21 @@ export function Queue({ shared }: { shared: Shared }) {
       <header className="page-head">
         <h1>Queue</h1>
         <span className="count">{shown.length}</span>
-        {team && (
-          <button className="btn quiet compact" type="button" onClick={() => setTeam(null)} aria-label={`Clear the ${team} filter`}>
-            <span><Team name={team} /></span><Icon.close />
-          </button>
-        )}
         <span className="spacer" />
-        <span className="sub">{building} in build{unscored ? ` · ${plural(unscored, "item")} unscored` : ""}</span>
+        <span className="sub">{building} building{unscored ? ` · ${unscored} unscored` : ""}</span>
+        {teams.length > 0 && (
+          <div className="actions team-filter">
+            <label className="sr-only" htmlFor="queue-team">Team</label>
+            <select id="queue-team" className="select" value={team ?? ""} onChange={(e) => setTeam(e.target.value || null)}>
+              <option value="">All teams</option>
+              {teams.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+        )}
       </header>
 
       {shown.length === 0 ? (
-        <Empty action={<button className="btn quiet compact" type="button" onClick={shared.openNew}>New request</button>}>
-          {team ? `Nothing from ${team} is waiting to be built.` : "Nothing is waiting to be built. Accepted requests land here, ranked by score."}
-        </Empty>
+        <Empty>{team ? `No open requests from ${team}.` : "No open requests."}</Empty>
       ) : (
         <div className="table-wrap">
           <table className="grid">
@@ -44,13 +47,13 @@ export function Queue({ shared }: { shared: Shared }) {
                 <th scope="col" className="pin pin-1">#</th>
                 <th scope="col" className="pin pin-2 title">Request</th>
                 <th scope="col">Team</th>
-                <th scope="col">Stage</th>
+                <th scope="col" className="stage-col">Stage</th>
                 <th scope="col" className="num col-inputs" title="1 a convenience, 5 moves bookings this quarter">Impact</th>
                 <th scope="col" className="num col-inputs" title="Accounts affected per week">Reach</th>
-                <th scope="col" className="num col-inputs" title="How sure the impact is">Conf.</th>
+                <th scope="col" className="num col-inputs" title="How sure the impact is">Confidence</th>
                 <th scope="col" className="num col-inputs" title="Engineering days">Effort</th>
                 <th scope="col" className="num">Score</th>
-                <th scope="col">Owner</th>
+                <th scope="col" className="who">Owner</th>
                 <th scope="col" className="num" title="Days in the current stage">Age</th>
               </tr>
             </thead>
@@ -75,12 +78,12 @@ function Row({ item, n, focused, flashed, now, onFocus }: { item: Item; n: numbe
       <td className="rank pin pin-1">{s == null ? "–" : n}</td>
       <td className="title pin pin-2"><a href={href} onClick={linkClick(href)} title={item.title}>{item.title}</a></td>
       <td className="team"><Team name={item.team} /></td>
-      <td><StageLabel stage={item.stage} /></td>
+      <td className="stage-col"><StageLabel stage={item.stage} /></td>
       {cell(item.impact)}{cell(item.reach, "/wk")}{cell(item.confidence, "%")}{cell(item.effort_days, "d")}
-      <td className="num" title={stale ? `Scored ${daysSince(item.scored_at!, now)} days ago. Rescore on the item page.` : undefined}>
-        {s == null ? <span className="score-none">Unscored</span> : <>{stale && <span className="stale-tag">stale</span>}<span className={`score${stale ? " stale" : ""}`}>{fmtScore(s)}</span></>}
+      <td className="num score-col" title={stale ? `Scored ${daysSince(item.scored_at!, now)} days ago. Rescore on the item page.` : undefined}>
+        {s == null ? <span className="score-none">Unscored</span> : <span className={`score${stale ? " stale" : ""}`}>{fmtScore(s)}</span>}
       </td>
-      <td className="who"><Avatar name={item.owner} size="sm" /></td>
+      <td className="who">{item.owner && <><Avatar name={item.owner} size="sm" /> {item.owner.split(/\s+/)[0]}</>}</td>
       <td className="num age">{agoShort(item.stage_changed_at, now)}</td>
     </tr>
   );

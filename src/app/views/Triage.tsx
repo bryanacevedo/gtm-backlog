@@ -1,7 +1,7 @@
 /* Triage as an inbox: requests on the left, the decision on the right, and a live
    preview of where the request lands in the queue before anyone accepts it. */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CONFIDENCE, IMPACT_RUBRIC, OPEN, rank, score, type Item } from "../../shared/domain";
 import type { Shared } from "../App";
 import { ago, agoShort, fmtScore, isTyping, linkClick } from "../lib";
@@ -55,8 +55,8 @@ export function Triage({ shared }: { shared: Shared }) {
       if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey || document.querySelector(".scrim")) return;
       if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); step(1); }
       else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); step(-1); }
-      else if (sel && tab === "waiting" && e.key === "m") { e.preventDefault(); shared.requestMove({ item: sel, to: "declined", mode: "merge" }); }
-      else if (sel && tab === "waiting" && e.key === "d") { e.preventDefault(); shared.requestMove({ item: sel, to: "declined", mode: "reason" }); }
+      else if (sel && tab === "waiting" && e.key === "m") { e.preventDefault(); shared.requestMove({ item: sel, to: "declined", mode: "decline", focus: "target" }); }
+      else if (sel && tab === "waiting" && e.key === "d") { e.preventDefault(); shared.requestMove({ item: sel, to: "declined", mode: "decline" }); }
       else if (e.key === "Escape" && open) { e.preventDefault(); setOpen(false); }
     };
     document.addEventListener("keydown", onKey);
@@ -76,8 +76,8 @@ export function Triage({ shared }: { shared: Shared }) {
         <div className="reqs" role="listbox" aria-label={tab === "waiting" ? "Waiting requests" : "Declined requests"}>
           {list.length === 0 ? (
             <div className="inbox-empty">
-              <span>{tab === "waiting" ? "Every request has an answer. New ones from the form or Slack land here." : "Nothing has been declined."}</span>
-              {tab === "waiting" && <button className="btn quiet compact" type="button" onClick={shared.openNew}>New request</button>}
+              <span>{tab === "waiting" ? "No requests waiting." : "Nothing has been declined."}</span>
+              {tab === "waiting" && <button className="btn primary compact" type="button" onClick={shared.openNew}>New request</button>}
             </div>
           ) : list.map((r) => (
             <button key={r.id} type="button" className={`req${leaving === r.id ? " leaving" : ""}${tab === "declined" ? " closed" : ""}${tab === "waiting" ? (seen.current.has(r.id) ? " seen" : " unseen") : ""}`} role="option" data-req={r.id}
@@ -85,7 +85,7 @@ export function Triage({ shared }: { shared: Shared }) {
               <Avatar name={r.requester} />
               <span className="t">{r.title}{tab === "waiting" && !seen.current.has(r.id) && <span className="sr-only"> (not opened yet)</span>}</span>
               <span className="age">{agoShort(tab === "waiting" ? r.created_at : r.stage_changed_at)}</span>
-              <span className="meta">{r.requester} · <Team name={r.team} /></span>
+              <span className="meta">{r.requester} <Team name={r.team} /></span>
             </button>
           ))}
         </div>
@@ -93,8 +93,8 @@ export function Triage({ shared }: { shared: Shared }) {
       </section>
 
       <section className="decision" aria-label="Decision">
-        {sel ? <Decision key={sel.id} item={sel} items={data.items} declinedView={tab === "declined"} shared={shared} onAccept={accept} onBack={() => setOpen(false)} onStep={step} />
-          : <div className="decision-body"><p className="hint">{tab === "waiting" ? "Nothing to decide." : "Pick a request to see why it was declined."}</p></div>}
+        {sel ? <Decision key={sel.id} item={sel} items={data.items} declinedView={tab === "declined"} shared={shared} onAccept={accept} onBack={() => setOpen(false)} />
+          : <div className="decision-body"><p className="hint">{tab === "waiting" ? "Nothing to decide." : "Nothing declined."}</p></div>}
       </section>
     </div>
   );
@@ -102,9 +102,9 @@ export function Triage({ shared }: { shared: Shared }) {
 
 /* ------------------------------------------------------------------ decision */
 
-function Decision({ item, items, declinedView, shared, onAccept, onBack, onStep }: {
+function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
   item: Item; items: Item[]; declinedView: boolean; shared: Shared;
-  onAccept: (i: Item, d: Draft) => void; onBack: () => void; onStep: (d: number) => void;
+  onAccept: (i: Item, d: Draft) => void; onBack: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(draftOf(item));
   const [busy, setBusy] = useState(false);
@@ -127,34 +127,29 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack, onStep 
     <>
       <div className="decision-head">
         <button className="btn icon phone-only" type="button" aria-label="Back to requests" onClick={onBack}><Icon.back /></button>
-        <span>{item.id.replace(/^bl_/, "REQ-").toUpperCase()}</span><span aria-hidden="true">·</span><Team name={item.team} />
-        <div className="sp">
-          <button className="btn icon" type="button" aria-label="Previous request" onClick={() => onStep(-1)}><Icon.up /></button>
-          <button className="btn icon" type="button" aria-label="Next request" onClick={() => onStep(1)}><Icon.down /></button>
-        </div>
+        <Team name={item.team} />
       </div>
       <div className="decision-body swap">
         <div className="who"><Avatar name={item.requester} size="sm" /><b>{item.requester}</b><span>requested {ago(item.created_at)}</span></div>
         <h2><a href={`/item/${item.id}`} onClick={linkClick(`/item/${item.id}`)}>{item.title}</a></h2>
         <p className="problem">{item.problem}</p>
         <div className="facts">
-          {item.touches.length > 0 && <span><Icon.bolt />Touches {item.touches.join(", ")}</span>}
-          {item.link && <a href={item.link} target="_blank" rel="noreferrer"><Icon.link />Source thread</a>}
+          {item.touches.length > 0 && <span>Touches {item.touches.join(", ")}</span>}
+          {item.link && <a className="btn icon" href={item.link} target="_blank" rel="noreferrer" aria-label="Open the source thread" title="Open the source thread"><Icon.external /></a>}
         </div>
 
         {declinedView ? (
           <div className="decided">
-            <span><b style={{ color: "var(--ink-1)", fontWeight: 600 }}>{merged ? "Merged" : "Declined"} {ago(item.stage_changed_at)}.</b> {item.decision_note}</span>
-            {merged && <a className="link" href={`/item/${merged.id}`} onClick={linkClick(`/item/${merged.id}`)}>Open “{merged.title}”</a>}
+            <span><b>{merged ? "Merged" : "Declined"} {ago(item.stage_changed_at)}.</b> {item.decision_note}</span>
+            {merged && <a className="btn quiet compact" href={`/item/${merged.id}`} onClick={linkClick(`/item/${merged.id}`)}>Open item</a>}
           </div>
         ) : (
           <div className="decide">
             <div className="decide-inputs">
-              <Steps label="Impact" n={5} value={draft.impact} onChange={(v) => setDraft({ ...draft, impact: v })} show={`${draft.impact} of 5`} titleFor={(n) => IMPACT_RUBRIC[n]} />
-              <Slider label="Reach" min={0} max={500} step={5} value={draft.reach} onChange={(v) => setDraft({ ...draft, reach: v })} show={`${draft.reach}/wk`} />
+              <Steps label="Impact" n={5} value={draft.impact} onChange={(v) => setDraft({ ...draft, impact: v })} show={impactShow(draft.impact)} titleFor={(n) => IMPACT_RUBRIC[n]} />
+              <Slider label="Reach" hint="Accounts per week" min={0} max={500} step={5} value={draft.reach} onChange={(v) => setDraft({ ...draft, reach: v })} show={`${draft.reach}/wk`} />
               <Steps label="Confidence" n={3} value={CONFIDENCE.indexOf(draft.confidence as 50 | 80 | 100) + 1} onChange={(v) => setDraft({ ...draft, confidence: CONFIDENCE[v - 1] })} show={`${draft.confidence}%`} titleFor={(n) => `${CONFIDENCE[n - 1]}%`} />
-              <Slider label="Effort" min={0.5} max={30} step={0.5} value={draft.effort_days} onChange={(v) => setDraft({ ...draft, effort_days: v })} show={`${draft.effort_days} ${draft.effort_days === 1 ? "day" : "days"}`} />
-              <p className="hint">{IMPACT_RUBRIC[draft.impact]}. Reach counts accounts per week.</p>
+              <Slider label="Effort" hint="Engineering days" min={0.5} max={30} step={0.5} value={draft.effort_days} onChange={(v) => setDraft({ ...draft, effort_days: v })} show={`${draft.effort_days} ${draft.effort_days === 1 ? "day" : "days"}`} />
             </div>
             <div className="decide-rank" aria-live="polite">
               <span className="hint">Lands in the queue at</span>
@@ -166,12 +161,10 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack, onStep 
       </div>
       <div className="decision-actions">
         {declinedView ? (
-          <button className="btn quiet" type="button" onClick={() => moveItem(item.id, "triage")}>Reopen request</button>
+          <button className="btn primary" type="button" onClick={() => moveItem(item.id, "triage")}>Reopen request</button>
         ) : (<>
           <button className="btn primary" type="button" onClick={go} disabled={busy}>{busy ? "Accepting…" : "Accept"} <kbd>A</kbd></button>
-          <button className="btn quiet" type="button" onClick={() => shared.requestMove({ item, to: "declined", mode: "merge" })}>Merge <kbd>M</kbd></button>
-          <button className="btn text" type="button" onClick={() => shared.requestMove({ item, to: "declined", mode: "reason" })}>Decline <kbd>D</kbd></button>
-          <span className="hint">Accepting moves it to Idea at #{pos}</span>
+          <button className="btn quiet" type="button" onClick={() => shared.requestMove({ item, to: "declined", mode: "decline" })}>Decline <kbd>D</kbd></button>
         </>)}
       </div>
     </>
@@ -213,7 +206,10 @@ function Tick({ value }: { value: string }) {
   return <b key={k} className={k ? "tick" : undefined}>{value}</b>;
 }
 
-export function Steps({ label, n, value, onChange, show, titleFor }: { label: string; n: number; value: number; onChange: (v: number) => void; show: string; titleFor: (n: number) => string }) {
+/** The impact number and its rubric word, so the scale reads as a reading, not a bare 3. */
+export const impactShow = (n: number) => <>{n}<span className="rub"> · {IMPACT_RUBRIC[n]}</span></>;
+
+export function Steps({ label, n, value, onChange, show, titleFor }: { label: string; n: number; value: number; onChange: (v: number) => void; show: ReactNode; titleFor: (n: number) => string }) {
   const id = `st-${label.toLowerCase()}`;
   return (
     <div className="in-row">
@@ -228,12 +224,12 @@ export function Steps({ label, n, value, onChange, show, titleFor }: { label: st
   );
 }
 
-export function Slider({ label, min, max, step, value, onChange, show }: { label: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void; show: string }) {
+export function Slider({ label, hint, min, max, step, value, onChange, show }: { label: string; hint?: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void; show: ReactNode }) {
   const id = `sl-${label.toLowerCase()}`;
   const pct = ((value - min) / (max - min)) * 100;
   return (
     <div className="in-row">
-      <label className="lab" htmlFor={id}>{label}</label>
+      <label className="lab" htmlFor={id} title={hint}>{label}</label>
       <input id={id} className="range" type="range" min={min} max={max} step={step} value={value} style={{ ["--p" as string]: `${pct}%` }} onChange={(e) => onChange(Number(e.target.value))} />
       <span className="val">{show}</span>
     </div>
