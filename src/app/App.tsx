@@ -21,7 +21,7 @@ const NAV = [
 /* The rail button is the page's primary action only on views that have none of their own. */
 const NEW_IS_PRIMARY = ["queue", "board", "shipped"];
 
-export interface Shared { openNew: () => void; requestMove: (p: PendingMove) => void }
+export interface Shared { openNew: () => void; requestMove: (p: PendingMove) => void; pending: PendingMove | null }
 
 export function App() {
   const loc = useLocation();
@@ -53,7 +53,7 @@ export function App() {
   }, [data]);
 
   const openNew = useCallback(() => setNewOpen(true), []);
-  const shared: Shared = useMemo(() => ({ openNew, requestMove: setPending }), [openNew]);
+  const shared: Shared = useMemo(() => ({ openNew, requestMove: setPending, pending }), [openNew, pending]);
   const overlay = newOpen || keysOpen || settingsOpen || !!pending || actorPrompt.open || nameEditing;
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function App() {
 
   const keyHints: Record<string, [string[], string][]> = {
     queue: [[["j", "k"], "move"], [["↵"], "open"]],
-    board: [[["j", "k"], "move"], [["←", "→"], "change stage"], [["↵"], "open"]],
+    board: [],
     triage: [[["j", "k"], "next request"], [["a"], "accept"], [["m"], "merge"], [["d"], "decline"]],
     item: [[["←", "→"], "change stage"], [["Esc"], "back"]],
     shipped: [],
@@ -141,10 +141,18 @@ export function App() {
         </main>
         {route.view !== "triage" && (
           <footer className="keys-foot" aria-label="Keyboard shortcuts">
-            {keyHints[route.view].map(([k, d]) => <span key={d}><Keys k={k} />{d}</span>)}
-            <span><Keys k={["1", "2", "3", "4"]} />views</span>
-            <span><Keys k={["c"]} />new request</span>
-            <span><Keys k={["?"]} />all keys</span>
+            {route.view === "board" ? <>
+              {/* The board's hints are the few it needs; the stage hint names where the arrows send the focused card (Board.tsx fills it). */}
+              <span><Keys k={["j", "k"]} />card</span>
+              <span id="stage-keys" className="stage-keys" />
+              <span><Keys k={["↵"]} />open</span>
+              <span><Keys k={["?"]} />all keys</span>
+            </> : <>
+              {keyHints[route.view].map(([k, d]) => <span key={d}><Keys k={k} />{d}</span>)}
+              <span><Keys k={["1", "2", "3", "4"]} />views</span>
+              <span><Keys k={["c"]} />new request</span>
+              <span><Keys k={["?"]} />all keys</span>
+            </>}
           </footer>
         )}
       </div>
