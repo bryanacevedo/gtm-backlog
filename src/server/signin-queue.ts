@@ -1,6 +1,7 @@
 /* The sign-in page's picture: the demo's own ranked Queue, written as HTML from the sample rows (seed.ts), never copied by hand.
    Rendered per request, so the stale mark and the order always match what the demo itself would show today. */
 
+import { glyphById, monogram, resolveTeamGlyphs } from "../shared/glyphs.ts";
 import { accentHover, resolveTeamColors } from "../shared/settings.ts";
 import { sampleQueue } from "./seed.ts";
 
@@ -13,13 +14,15 @@ const NIL = `<span class="nil">–</span>`;
 /** The stage figures and the ranked rows, for the `<!--queue-->` slot. */
 export function signinQueueHtml(nowMs: number = Date.now()): string {
   const q = sampleQueue(nowMs);
-  const color = resolveTeamColors(null, q.teams).color;
+  const color = resolveTeamColors(null, q.teams).color, glyph = resolveTeamGlyphs(null, q.teams).glyph;
+  // The same tile the app draws (TeamTile in ui.tsx): the team's colour, its glyph in white line, the letters when it has none.
+  const tile = (t: string) => `<span class="team-av" style="--team:${color[t]}" aria-hidden="true">${glyph[t] ? `<svg viewBox="0 0 24 24"><path d="${glyphById(glyph[t])!.d}"/></svg>` : esc(monogram(t))}</span>`;
   const cell = (v: number | null, unit = "") => `<td class="num in">${v == null ? NIL : `${num(v)}${unit ? `<span class="unit">${unit}</span>` : ""}`}</td>`;
   const body = q.rows.map((r) => `
           <tr>
             <td class="rank">${r.rank ?? "–"}</td>
             <td class="title"><span>${esc(r.title)}</span></td>
-            <td class="team"><span class="tdot" style="background:${color[r.team]}" aria-hidden="true"></span>${esc(r.team)}</td>
+            <td class="team">${tile(r.team)}${esc(r.team)}</td>
             <td class="stg${r.stage === "building" ? " on" : ""}">${r.stage === "building" ? "Building" : "Idea"}</td>
             ${cell(r.impact)}${cell(r.reach, "/wk")}${cell(r.confidence, "%")}${cell(r.effort, r.effort === 1 ? " day" : " days")}
             <td class="num sc">${r.score == null ? `<span class="score-none">Unscored</span>` : `<span class="score${r.stale ? " stale" : ""}">${n0.format(r.score)}</span>`}</td>

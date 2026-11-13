@@ -5,7 +5,7 @@ import type { Shared } from "../App";
 import { planMove } from "../forms";
 import { ago, fmtDay, fmtNum, fmtScore, isTyping, linkClick, navigate } from "../lib";
 import { addLink, logResult, moveItem, patchItem, removeLink, useStore } from "../store";
-import { Avatar, Empty, Icon, Inline, StageSelect, Team, Tip } from "../ui";
+import { Avatar, Empty, Icon, Inline, StageSelect, Team, TeamTile, Tip } from "../ui";
 import { Slider, Steps, impactShow } from "./Triage";
 
 /* The one forward move of each stage is the page's primary action. Everything else is reached from the stage word. */
@@ -65,6 +65,7 @@ export function ItemPage({ id, shared }: { id: string; shared: Shared }) {
       </nav>
 
       <header className="item-head">
+        <div className="team-eyebrow"><TeamTile name={item.team} size="md" />{item.team}</div>
         <h1><Inline value={item.title} placeholder="Untitled" ariaLabel="title" onSave={save("title")} flash={flash === item.id} /></h1>
         <div className="move-bar">
           <StageSelect stage={item.stage} silent={silent} moves={moves} onMove={go} />

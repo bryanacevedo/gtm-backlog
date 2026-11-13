@@ -15,7 +15,7 @@ export interface Snapshot {
   meta: { demo: boolean; writeKey: boolean; now: string; settings: Settings; photos?: Record<string, string>; space?: "demo" | "real"; user?: { name: string; email: string; picture?: string } | null; signIn?: boolean };
 }
 
-export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void }
+export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void; undoKey?: string }
 
 type State = { data: Snapshot | null; loadError: string | null; toasts: Toast[]; actor: string | null; flash: string | null };
 
@@ -36,9 +36,9 @@ export const getState = () => state;
 /* ----------------------------------------------------------------- toasts */
 
 let toastSeq = 0;
-export function toast(text: string, tone: Toast["tone"] = "info", undo?: () => void) {
+export function toast(text: string, tone: Toast["tone"] = "info", undo?: () => void, undoKey?: string) {
   const id = ++toastSeq;
-  set({ toasts: [...state.toasts.slice(-2), { id, text, tone, undo }] });
+  set({ toasts: [...state.toasts.slice(-2), { id, text, tone, undo, undoKey }] });
   setTimeout(() => dismiss(id), 8000);
 }
 export function dismiss(id: number) { set({ toasts: state.toasts.filter((t) => t.id !== id) }); }
@@ -174,7 +174,7 @@ export async function patchItem(id: string, patch: Record<string, unknown>): Pro
   }
 }
 
-export interface MoveOpts { system_url?: string; note?: string; merged_into?: string; silent?: boolean }
+export interface MoveOpts { system_url?: string; note?: string; merged_into?: string; silent?: boolean; undoKey?: string }
 
 export async function moveItem(id: string, to: Stage, opts: MoveOpts = {}): Promise<boolean> {
   const before = state.data?.items.find((i) => i.id === id);
@@ -182,11 +182,12 @@ export async function moveItem(id: string, to: Stage, opts: MoveOpts = {}): Prom
   const t = new Date().toISOString();
   replaceItem({ ...before, stage: to, stage_changed_at: t, live_at: to === "live" ? before.live_at ?? t : before.live_at, system_url: opts.system_url ?? before.system_url });
   try {
-    const { item } = await call<{ item: Item }>("POST", `/api/items/${id}/move`, { to, expect: before.stage, ...opts });
+    const { undoKey: _k, silent: _s, ...send } = opts;
+    const { item } = await call<{ item: Item }>("POST", `/api/items/${id}/move`, { to, expect: before.stage, ...send });
     replaceItem(item); flash(id); refreshEvents();
     if (!opts.silent) {
       const canUndo = to !== "live" && to !== "declined" && to !== "retired" && before.stage !== "triage";
-      toast(`Moved “${short(item.title)}” to ${stageName(to)}.`, "info", canUndo ? () => moveItem(id, before.stage, { silent: true }) : undefined);
+      toast(`Moved “${short(item.title)}” to ${stageName(to)}.`, "info", canUndo ? () => moveItem(id, before.stage, { silent: true }) : undefined, canUndo ? opts.undoKey : undefined);
     }
     return true;
   } catch (e) {

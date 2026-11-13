@@ -4,6 +4,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { label, teamsOf, type Stage } from "../shared/domain";
+import { AGENT_GLYPH, AGENT_NAMES, glyphById, monogram, resolveTeamGlyphs, type TeamGlyphState } from "../shared/glyphs";
 import { fallbackColor, pickPhoto, resolveTeamColors, type TeamColorState } from "../shared/settings";
 import { dismiss, useStore } from "./store";
 
@@ -35,8 +36,9 @@ export function StageSelect({ stage, silent = false, moves, onMove }: { stage: S
 
 /* ------------------------------------------------------------- people, teams */
 
-/* Team colours are identity, not state: a 7px mark beside the team name tells teams apart at a glance (Bryan kept it,
-   2026-11-12). Each comes from a validated palette in the settings (shared/settings.ts), never a free hex, and no two teams share one. */
+/* Team colours are identity, not state: a tile in the team's colour with its glyph tells teams apart at a glance (Bryan kept the
+   colour, 2026-11-12, and picked the tile, 2026-11-13). The colour comes from a validated palette in the settings (shared/settings.ts),
+   never a free hex, the glyph from a closed set of sixteen (shared/glyphs.ts), and no two teams share either. */
 let colorCache: { stored: unknown; teams: string; out: TeamColorState } | null = null;
 export function useTeamColors(): TeamColorState {
   const stored = useStore((s) => s.data?.meta.settings.team_colors);
@@ -46,10 +48,15 @@ export function useTeamColors(): TeamColorState {
   if (!colorCache || colorCache.stored !== stored || colorCache.teams !== key) colorCache = { stored, teams: key, out: resolveTeamColors(stored, teams) };
   return colorCache.out;
 }
-export function useTeamColor(name: string) {
-  return useTeamColors().color[name] ?? fallbackColor(name);
+let glyphCache: { stored: unknown; teams: string; out: TeamGlyphState } | null = null;
+export function useTeamGlyphs(): TeamGlyphState {
+  const stored = useStore((s) => s.data?.meta.settings.team_glyphs);
+  const items = useStore((s) => s.data?.items);
+  const teams = teamsOf(items ?? []);
+  const key = teams.join("|");
+  if (!glyphCache || glyphCache.stored !== stored || glyphCache.teams !== key) glyphCache = { stored, teams: key, out: resolveTeamGlyphs(stored, teams) };
+  return glyphCache.out;
 }
-const PERSON_COLORS = ["#C2410C", "#1D4ED8", "#BE185D", "#0F766E", "#3F3F46", "#B45309", "#15803D", "#9F1239", "#0369A1", "#4D7C0F"];
 
 /* Photos for the fictional sample team, from Unsplash (see CREDITS.md).
    Anyone not listed, including real users, gets initials on a stable color. */
@@ -67,10 +74,11 @@ export const PHOTOS: Record<string, string> = {
   "Jordan Pike": "/avatars/jordan-pike.jpg",
 };
 
-export function personColor(name: string) {
+/** One of eight hues, from the name. The pale ground and deep ink of each are tokens (--pg-N, --pi-N). */
+export function personHue(name: string) {
   let h = 0;
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return PERSON_COLORS[h % PERSON_COLORS.length];
+  return h % 8;
 }
 
 /** Precedence: the person's uploaded photo (matched by name), an explicit src, the sample team's photo, the signed-in user's Google photo (matched by name), then initials.
@@ -84,22 +92,29 @@ export function Avatar({ name, size, src }: { name: string | null; size?: "sm" |
   const photo = pickPhoto(name, { uploaded, src, sample: PHOTOS, me });
   const shown = photo && photo !== failed ? photo : null;
   const initials = name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+  // An AI owner is the ink disc with a cursor; a person with no photo is deep ink initials on a pale ground of one hue. A photo covers both.
+  if (!shown && AGENT_NAMES.includes(name))
+    return <span className={`${cls} agent`} title={name} aria-hidden="true"><svg viewBox="0 0 24 24"><path d={AGENT_GLYPH} /></svg></span>;
+  const hue = personHue(name);
   return (
-    <span className={cls} style={shown ? undefined : { background: personColor(name) }} title={name} aria-hidden="true">
+    <span className={cls} style={shown ? undefined : { ["--pg" as string]: `var(--pg-${hue})`, ["--pi" as string]: `var(--pi-${hue})` }} title={name} aria-hidden="true">
       {shown ? <img src={shown} alt="" loading="lazy" width={26} height={26} referrerPolicy="no-referrer" onError={() => setFailed(shown)} /> : initials}
     </span>
   );
 }
 
-/** The team's colour mark. It identifies, it never signals a state. */
-export function TeamMark({ name }: { name: string }) {
-  const color = useTeamColor(name);
+/** The team tile: a rounded square in the team's colour with its glyph in white line (the team's letters only when it has no glyph).
+    18px in rails, rows and cards, "md" 24px in an item header, "lg" 32px in Settings. It identifies, it never signals a state. */
+export function TeamTile({ name, size, color, glyph }: { name: string; size?: "md" | "lg"; color?: string; glyph?: string | null }) {
+  const colors = useTeamColors(), glyphs = useTeamGlyphs();
+  const hex = color ?? colors.color[name] ?? fallbackColor(name);
+  const g = glyphById(glyph !== undefined ? glyph : glyphs.glyph[name]);
   // design-lint: allow team identity colour, approved by Bryan
-  return <span className="tdot" style={{ background: color }} aria-hidden="true" />;
+  return <span className={`team-av${size ? " " + size : ""}`} style={{ ["--team" as string]: hex }} aria-hidden="true">{g ? <svg viewBox="0 0 24 24"><path d={g.d} /></svg> : monogram(name)}</span>;
 }
 
 export function Team({ name }: { name: string }) {
-  return <><TeamMark name={name} />{name}</>;
+  return <><TeamTile name={name} />{name}</>;
 }
 
 /* ------------------------------------------------------------------- icons */
@@ -161,7 +176,7 @@ export function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={`toast${t.tone === "error" ? " error" : ""}`}>
           <span>{t.text}</span>
-          {t.undo && <button className="btn text" type="button" onClick={() => { t.undo!(); dismiss(t.id); }}>Undo</button>}
+          {t.undo && <button className="btn text" type="button" onClick={() => { t.undo!(); dismiss(t.id); }}>Undo{t.undoKey && <kbd>{t.undoKey}</kbd>}</button>}
           <button className="btn icon" type="button" aria-label="Dismiss" onClick={() => dismiss(t.id)}><Icon.close /></button>
         </div>
       ))}
