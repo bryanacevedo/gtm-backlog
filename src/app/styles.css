@@ -18,6 +18,7 @@
   --line-3: rgba(9, 9, 11, 0.24);
   --fill: rgba(9, 9, 11, 0.045);
   --hover: rgba(9, 9, 11, 0.03);
+  --scrim: rgba(9, 9, 11, 0.28);
   /* The one accent: interaction and selection only (buttons, selected controls, focus). It is a per-install setting, so
      nothing below spells out a colour for it; src/app/store.ts applyAccent() overrides these three, and the lint rule
      literal-colour keeps a literal hex out of every rule below this block. The default is the near-black ink. */
@@ -403,7 +404,7 @@ table.grid { width: 100%; border-collapse: collapse; font: var(--t-data); }
 .card[data-focus] { box-shadow: 0 0 0 1px var(--line-3); }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r); }
 .card[data-press] { transform: scale(0.985); background: var(--row-hover); } /* acknowledged on pointer-down, before a drag is known */
-.card[data-flash="true"] { animation: settle 420ms var(--ease); }
+.card[data-flash="true"] { animation: settle 420ms var(--ease); } /* a ring that fades, no movement, so it stays under reduced motion */
 .card > div { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
 .card .t { flex: 1; min-width: 0; font: 500 13px/19px var(--sans); color: var(--ink-1); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .card .r2 { align-items: center; min-height: 18px; font: var(--t-meta); color: var(--ink-3); }
@@ -434,8 +435,13 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 .toast .btn.text kbd { background: rgba(255, 255, 255, 0.14); box-shadow: none; color: inherit; }
 .keys-foot .stage-keys { min-width: 132px; gap: 14px; }
 @media (prefers-reduced-motion: reduce) {
-  .card[data-press] { transform: none; }
-  .card.ghost[data-lift] { scale: 1; }
+  .card[data-press] { transform: none; } /* the press keeps its background change */
+  .card.ghost[data-lift] { scale: 1; } /* the lifted card is told by its shadow, not by growing */
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card.is-slot { background: var(--row-hover); box-shadow: inset 0 0 0 1px var(--accent); }
+  .btn.primary kbd, .new-btn.primary kbd { background: var(--accent-hover); }
+  .toast .btn.text kbd { background: var(--ink-2); }
 }
 @media (prefers-contrast: more) {
   .card.is-slot { background: var(--panel); box-shadow: inset 0 0 0 2px var(--accent); }
@@ -679,7 +685,7 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 
 /* ------------------------------------------------------------------ overlays */
 
-.scrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; background: rgba(9, 9, 11, 0.28); overscroll-behavior: contain; animation: fade 160ms ease; }
+.scrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: start center; padding: 12vh 16px 16px; background: var(--scrim); overscroll-behavior: contain; animation: fade 160ms ease; }
 .dialog { width: min(540px, 100%); max-height: 76vh; overflow: auto; display: grid; gap: 18px; padding: 22px 24px 20px; border-radius: 12px; background: var(--panel); box-shadow: var(--overlay); animation: rise 200ms var(--ease); }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .dialog h2 { font: var(--t-title); letter-spacing: -0.014em; }
@@ -709,18 +715,33 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(0.99); } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes settle { 0% { box-shadow: 0 0 0 1px var(--line-3); } }
 @keyframes saved { 0% { box-shadow: inset 0 0 0 1px var(--ink-3); } 100% { box-shadow: inset 0 0 0 1px transparent; } }
 
-/* Reduced motion means gentler feedback, not none: opacity and colour changes stay (100ms), movement goes. */
+/* Reduced motion means gentler feedback, not none: opacity and colour changes stay (100ms), movement goes. A press or hover that scaled now dims. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition-property: opacity, color, background-color, box-shadow !important; transition-duration: 100ms !important; }
-  .page, .swap, .scrim, .dialog, .toast { animation-name: fade !important; animation-duration: 100ms !important; }
-  .decide-rank .big b.tick, .card[data-flash="true"] { animation: none !important; }
-  .btn:active:not(:disabled), .new-btn:active, .shape-set button:active:not(:disabled) { transform: none; }
+  *, *::before, *::after { transition-property: opacity, color, background-color, box-shadow, visibility !important; transition-duration: 100ms !important; }
+  .page, .swap, .scrim, .dialog, .toast, .decide-rank .big b.tick { animation-name: fade !important; animation-duration: 100ms !important; }
+  .btn:active:not(:disabled), .new-btn:active, .tile-btn:active, .swatches button:active:not(:disabled), .shape-set button:active:not(:disabled) { transform: none; opacity: 0.7; }
+  .steps button:hover i { transform: none; opacity: 0.7; }
+  .range:active::-webkit-slider-thumb { transform: none; }
   .req.leaving { transform: none; }
 }
+/* Reduced transparency: a tint becomes a solid of the same weight, a scrim a solid. The app uses no blur. */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --fill: var(--row-focus); --hover: var(--row-hover); --scrim: #C8C8CD; }
+  .toast .btn.text:hover, .toast .btn.icon:hover { background: var(--ink-2); }
+}
+/* More contrast: hairlines darken, overlays get a dark ring, and a near-solid selected or tinted surface gets a defined border. */
 @media (prefers-contrast: more) {
-  :root { --line: rgba(9, 9, 11, 0.4); --line-2: rgba(9, 9, 11, 0.6); }
+  :root {
+    --line: rgba(9, 9, 11, 0.4); --line-2: rgba(9, 9, 11, 0.6); --line-3: rgba(9, 9, 11, 0.8);
+    --overlay: 0 0 0 1px var(--ink-2), 0 16px 40px rgba(9, 9, 11, 0.14), 0 2px 6px rgba(9, 9, 11, 0.06);
+  }
+  .nav-link[aria-current="page"], .team-line:has(.team-link[aria-current="true"]), .tab[aria-selected="true"], .req[aria-selected="true"], .mini > div.mine { box-shadow: inset 0 0 0 1px var(--ink-2); }
+  .grid tbody tr[data-focus="true"] td { box-shadow: inset 0 1px 0 var(--ink-2), inset 0 -1px 0 var(--ink-2); }
+  .team-av { box-shadow: 0 0 0 1px var(--ink-2); }
+  .av:has(img)::after, .av:not(:has(img))::after { box-shadow: inset 0 0 0 1px var(--ink-2); }
 }
 
 /* ------------------------------------------------------------------- narrow */
