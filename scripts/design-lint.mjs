@@ -16,6 +16,13 @@
      type-sizes      a stylesheet that uses more than four distinct font sizes (avatar initials excepted)
      literal-colour  a hex colour written into a rule of a stylesheet instead of a token: every colour is a custom property defined in a :root
                      block, so the accent (a per-install setting) and the rest can change in one place. rgba() shadows and tints are not counted
+     motion-transition  a rule that transitions transform, translate, scale, rotate or all, in a sheet with no prefers-reduced-motion rule that narrows transition-property (T17)
+     motion-animation   a rule that runs a keyframes animation that moves (transform, translate, scale, rotate) with no prefers-reduced-motion rule for the same selector
+     motion-press       a :hover, :active, [data-press] or [data-lift] rule that scales or moves, with no prefers-reduced-motion rule for the same selector
+     motion-waapi       a .animate() call on transform, translate or scale in a script that never checks prefers-reduced-motion
+     blur               backdrop-filter or filter: blur with no prefers-reduced-transparency rule for the same selector
+     translucent-surface  a position: fixed rule whose background is translucent, with no prefers-reduced-transparency rule that replaces it (a rule for the selector, or a redefined token)
+     contrast-tokens    a sheet that defines --line in :root and never redefines it under prefers-contrast: more
      allow-reason    a `design-lint: allow` comment with no reason after it
 
    Exempt a line with the comment `design-lint: allow <reason>` (CSS or TSX), on the rule or tag, or on the line above it. The reason is required.
@@ -248,6 +255,95 @@ function lintCss(sheets, vars, allowFor, out, shapes) {
   }
 }
 
+// ---------- accessibility signals (T17) ----------
+// The three signals are answered independently: reduced motion (no movement, opacity and colour stay), reduced transparency
+// (translucent becomes solid, no blur), more contrast (a defined border on near-solid surfaces).
+const MOVES_RE = /(?<![-\w])(transform|translate|scale|rotate)(?![-\w])/;
+const sameSel = (s) => s.replace(/\s+/g, " ").replace(/=\s*(?:"[^"]*"|'[^']*'|[^\]\s]+)/g, "").trim();
+function mediaBlocks(clean) {
+  // [{ query, body, line }] for each top-level @media, found by balanced braces. The base text has the three signal blocks blanked.
+  const blocks = []; let base = "", last = 0;
+  for (const m of clean.matchAll(/@media\s*([^{]*)\{/g)) {
+    if (m.index < last) continue;
+    let depth = 1, i = m.index + m[0].length;
+    for (; i < clean.length && depth; i++) { if (clean[i] === "{") depth++; else if (clean[i] === "}") depth--; }
+    const body = clean.slice(m.index + m[0].length, i - 1), q = m[1].trim();
+    if (!/prefers-(reduced-motion|reduced-transparency|contrast)/.test(q)) continue;
+    blocks.push({ query: q, body, line: lineAt(clean, m.index) });
+    base += clean.slice(last, m.index) + blank(clean.slice(m.index, i)); last = i;
+  }
+  return { blocks, base: base + clean.slice(last) };
+}
+const translucent = (v, vars, depth = 0) => {
+  if (!v || depth > 4) return false;
+  for (const m of v.matchAll(/rgba?\([^)]*?[,/]\s*([\d.]+)(%?)\s*\)/gi)) if ((m[2] ? +m[1] / 100 : +m[1]) < 0.95) return true;
+  if (/color-mix\([^)]*transparent/i.test(v)) return true;
+  for (const m of v.matchAll(/var\(\s*(--[\w-]+)/g)) if ((vars.get(m[1]) ?? []).some((d) => translucent(d, vars, depth + 1))) return true;
+  return false;
+};
+function lintSignals(sheets, vars, allowFor, out) {
+  for (const { file, raw } of sheets) {
+    if (!file.endsWith(".css")) continue;
+    const ok = allowFor(file), clean = cssOf(file, raw).replace(/\/\*[\s\S]*?\*\//g, blank);
+    const { blocks, base } = mediaBlocks(clean);
+    const covers = (query) => {
+      const m = new Map(), tokens = new Set();
+      for (const b of blocks) if (query.test(b.query)) for (const r of parseCss(b.body)) {
+        for (const part of r.selector.split(/,(?![^(]*\))/)) {
+          const k = sameSel(part), cur = m.get(k) ?? new Map();
+          for (const [p, v] of r.decls) { cur.set(p, v); if (/^(:root|html)$/.test(k) && p.startsWith("--")) tokens.add(p); }
+          m.set(k, cur);
+        }
+      }
+      return { m, tokens };
+    };
+    const motion = covers(/reduced-motion\s*:\s*reduce/), transp = covers(/reduced-transparency\s*:\s*reduce/), contrast = covers(/prefers-contrast\s*:\s*more/);
+    const moving = new Set();
+    for (const k of clean.matchAll(/@keyframes\s+([\w-]+)\s*\{/g)) {
+      let depth = 1, i = k.index + k[0].length; for (; i < clean.length && depth; i++) { if (clean[i] === "{") depth++; else if (clean[i] === "}") depth--; }
+      if (MOVES_RE.test(clean.slice(k.index, i))) moving.add(k[1]);
+    }
+    const universal = [...motion.m].some(([sel, d]) => /(^|,)\s*\*/.test(sel) && d.has("transition-property") && !MOVES_RE.test(d.get("transition-property")) && !/\ball\b/.test(d.get("transition-property")));
+    const seen = new Set();
+    const report = (b, part, rule, snippet) => { const key2 = rule + part; if (seen.has(key2)) return; seen.add(key2); if (!isAllowed(ok, b.line, b.endLine)) out.push({ file, line: b.line, rule, snippet: squash(snippet) }); };
+    for (const b of parseCss(base)) for (const raw2 of b.selector.split(/,(?![^(]*\))/)) {
+      const part = raw2.replace(/\s+/g, " ").trim(), k = sameSel(part), d = b.decls;
+      const tr = [d.get("transition"), d.get("transition-property")].filter(Boolean).join(" ");
+      if (tr && (MOVES_RE.test(tr) || /(^|[\s,])all(?![-\w])/.test(tr)) && !universal && !motion.m.get(k)?.has("transition"))
+        report(b, part, "motion-transition", `${part} { transition: ${tr} }`);
+      const an = [d.get("animation"), d.get("animation-name")].filter(Boolean).join(" ");
+      if (an && [...moving].some((n) => new RegExp(`(^|[\\s,])${n}([\\s,;]|$)`).test(an)) && !(motion.m.get(k)?.has("animation") || motion.m.get(k)?.has("animation-name")))
+        report(b, part, "motion-animation", `${part} { animation: ${an} }`);
+      for (const p of ["transform", "translate", "scale", "rotate"])
+        if (d.has(p) && !/^(none|1|1 1|translate\(0\)|translate\(0,\s*0\))$/.test(d.get(p).trim()) && /:(hover|active)|\[data-(press|lift)/.test(part) && !motion.m.get(k)?.has(p))
+          report(b, part, "motion-press", `${part} { ${p}: ${d.get(p)} }`);
+      const bl = d.get("backdrop-filter") ?? d.get("-webkit-backdrop-filter") ?? (/blur/.test(d.get("filter") ?? "") ? d.get("filter") : null);
+      if (bl && !/^none$/.test(bl.trim()) && !(transp.m.get(k)?.has("backdrop-filter") || transp.m.get(k)?.has("filter")))
+        report(b, part, "blur", `${part} { backdrop-filter: ${bl} }`);
+      const bg = d.get("background") ?? d.get("background-color");
+      if (/^fixed$/.test((d.get("position") ?? "").trim()) && bg && translucent(bg, vars)) {
+        const tokens = [...bg.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]);
+        if (!(transp.m.get(k)?.has("background") || transp.m.get(k)?.has("background-color")) && !tokens.some((t) => transp.tokens.has(t)))
+          report(b, part, "translucent-surface", `${part} { background: ${bg} }`);
+      }
+    }
+    if (/--line\s*:/.test(base) && !contrast.tokens.has("--line"))
+      out.push({ file, line: 1, rule: "contrast-tokens", snippet: "--line is defined but never redefined under prefers-contrast: more" });
+  }
+}
+
+// WAAPI movement in a script needs a reduced-motion check somewhere in the same file.
+function lintWaapi(file, raw, ok, out) {
+  if (/prefers-reduced-motion/.test(raw)) return;
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, blank).replace(/^(\s*)\/\/.*$/gm, blank);
+  for (const m of src.matchAll(/\.animate\(\s*\[([^\]]*(?:\][^\]]*)*?)\]\s*,/g)) {
+    if (!/(transform|translate|scale)\s*:/.test(m[1])) continue;
+    const line = lineAt(src, m.index);
+    if (isAllowed(ok, line, line)) continue;
+    out.push({ file, line, rule: "motion-waapi", snippet: squash(m[0]) });
+  }
+}
+
 // ---------- literal colours ----------
 // A hex colour belongs in a :root token block. Anywhere else it is a second copy that a change of accent would miss.
 function lintLiterals(sheets, allowFor, out) {
@@ -388,7 +484,8 @@ export function lintFiles(files) {
   lintCss(sheets, vars, (file) => allow.get(file), out, shapes);
   lintSizes(sheets, out);
   lintLiterals(sheets, (file) => allow.get(file), out);
-  for (const { f, rel, raw } of files) if (!f.endsWith(".css")) lintMarkup(rel, raw, allow.get(rel), out, shapes);
+  lintSignals(sheets, vars, (file) => allow.get(file), out);
+  for (const { f, rel, raw } of files) if (!f.endsWith(".css")) { lintMarkup(rel, raw, allow.get(rel), out, shapes); if (/\.(tsx?|jsx?)$/.test(rel)) lintWaapi(rel, raw, allow.get(rel), out); }
   return out.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.rule.localeCompare(b.rule));
 }
 

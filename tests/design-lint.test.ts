@@ -66,4 +66,40 @@ describe("the rules a script can check", () => {
     // avatar initials sit in a circle and are not counted
     expect(css(`${five.replace("e{font-size:11px}", "")} .av.sm{font-size:8px}`)).not.toContain("type-sizes");
   });
+
+  it("T17 reduced motion: a moving transition, animation or press needs an override", () => {
+    const base = `@keyframes rise { from { opacity: 0; transform: translateY(8px); } } @keyframes fade { from { opacity: 0; } }`;
+    expect(css(`.a { transition: transform 100ms; }`)).toContain("motion-transition");
+    expect(css(`.a { transition: all 100ms; }`)).toContain("motion-transition");
+    expect(css(`.a { transition: opacity 100ms, color 100ms; }`)).not.toContain("motion-transition");
+    expect(css(`.a { transition: transform 100ms; } @media (prefers-reduced-motion: reduce) { *, *::before { transition-property: opacity, color !important; } }`)).not.toContain("motion-transition");
+    expect(css(`${base} .d { animation: rise 200ms; }`)).toContain("motion-animation");
+    expect(css(`${base} .d { animation: fade 200ms; }`)).not.toContain("motion-animation");
+    expect(css(`${base} .d { animation: rise 200ms; } @media (prefers-reduced-motion: reduce) { .d { animation-name: fade; } }`)).not.toContain("motion-animation");
+    expect(css(`.b:active { transform: scale(0.97); }`)).toContain("motion-press");
+    expect(css(`.c[data-lift="true"] { scale: 1.02; }`)).toContain("motion-press");
+    expect(css(`.b:active { transform: scale(0.97); } @media (prefers-reduced-motion: reduce) { .b:active { transform: none; } }`)).not.toContain("motion-press");
+    expect(css(`.c[data-lift="true"] { scale: 1.02; } @media (prefers-reduced-motion: reduce) { .c[data-lift] { scale: 1; } }`)).not.toContain("motion-press");
+    expect(css(`.toasts { transform: translateX(-50%); }`)).not.toContain("motion-press");
+  });
+
+  it("T17 reduced transparency: blur and a translucent fixed surface need a solid fallback", () => {
+    expect(css(`.bar { backdrop-filter: blur(8px); }`)).toContain("blur");
+    expect(css(`.bar { backdrop-filter: blur(8px); } @media (prefers-reduced-transparency: reduce) { .bar { backdrop-filter: none; } }`)).not.toContain("blur");
+    expect(css(`.scrim { position: fixed; background: rgba(9, 9, 11, 0.28); }`)).toContain("translucent-surface");
+    expect(css(`:root { --scrim: rgba(9, 9, 11, 0.28); } .scrim { position: fixed; background: var(--scrim); }`)).toContain("translucent-surface");
+    expect(css(`:root { --scrim: rgba(9, 9, 11, 0.28); } .scrim { position: fixed; background: var(--scrim); } @media (prefers-reduced-transparency: reduce) { :root { --scrim: #C8C8CD; } }`)).not.toContain("translucent-surface");
+    expect(css(`.scrim { position: fixed; background: #fff; }`)).not.toContain("translucent-surface");
+  });
+
+  it("T17 more contrast: --line must be redefined", () => {
+    expect(css(`:root { --line: rgba(9, 9, 11, 0.08); }`)).toContain("contrast-tokens");
+    expect(css(`:root { --line: rgba(9, 9, 11, 0.08); } @media (prefers-contrast: more) { :root { --line: rgba(9, 9, 11, 0.4); } }`)).not.toContain("contrast-tokens");
+  });
+
+  it("T17 motion-waapi: a script that animates movement must check reduced motion", () => {
+    expect(tsx(`export const f = (c: HTMLElement) => c.animate([{ transform: "translate(4px, 0)" }, { transform: "none" }], { duration: 160 });`)).toContain("motion-waapi");
+    expect(tsx(`const calm = () => matchMedia("(prefers-reduced-motion: reduce)").matches;\nexport const f = (c: HTMLElement) => { if (!calm()) c.animate([{ transform: "translate(4px, 0)" }, { transform: "none" }], { duration: 160 }); };`)).not.toContain("motion-waapi");
+    expect(tsx(`export const f = (c: HTMLElement) => c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100 });`)).not.toContain("motion-waapi");
+  });
 });
