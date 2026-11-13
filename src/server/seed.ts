@@ -2,6 +2,8 @@
    to the moment it runs, so the demo always looks like a live team's week.
    Generic work any B2B team recognizes; no real company, person or number. */
 
+import { isScoreStale, rank, score, teamsOf, type Item } from "../shared/domain.ts";
+
 type Row = {
   title: string; problem: string; team: string; requester: string; touches: string[];
   stage: "triage" | "idea" | "building" | "live" | "declined" | "retired";
@@ -70,6 +72,31 @@ const rows: Row[] = [
   { title: "Event leads into the CRM", problem: "Get event leads into the CRM faster.", team: "Field Marketing", requester: "Priya Raman", touches: ["speed"], stage: "declined", createdDaysAgo: 21, stageDaysAgo: 19, note: "MERGE:Event attendee list to sequences" },
   { title: "Manual lead score spreadsheet", problem: "A shared sheet where reps scored leads by hand.", team: "SDR", requester: "Marcus Bell", touches: ["pipeline"], stage: "retired", owner: "Sam Ortiz", impact: 2, reach: 30, confidence: 50, effort: 1, scoredDaysAgo: 160, createdDaysAgo: 170, stageDaysAgo: 20, liveDaysAgo: 150, system: "https://example.com/sheets/lead-score", note: "Replaced by reply classification and demo routing." },
 ];
+
+/** The demo's ranked Queue as the sign-in page shows it, read from the sample rows above (so it cannot drift from the demo):
+    the open requests in rank order with the inputs that produce each score, and the counts of the four stages. */
+export interface SampleQueueRow { rank: number | null; title: string; team: string; stage: "idea" | "building"; impact: number | null; reach: number | null; confidence: number | null; effort: number | null; score: number | null; stale: boolean }
+export function sampleQueue(nowMs: number = Date.now()): { rows: SampleQueueRow[]; teams: string[]; counts: { idea: number; building: number; live: number; results: number } } {
+  const iso = (daysAgo: number) => new Date(nowMs - daysAgo * 86_400_000).toISOString();
+  const open = rows.filter((r) => r.stage === "idea" || r.stage === "building").map((r) => {
+    const scored = r.impact != null || r.reach != null || r.confidence != null || r.effort != null;
+    return { ...r, effort_days: r.effort ?? null, impact: r.impact ?? null, reach: r.reach ?? null, confidence: r.confidence ?? null, created_at: iso(r.createdDaysAgo), scored_at: scored ? iso(r.scoredDaysAgo ?? r.stageDaysAgo) : null };
+  });
+  const ranked = rank(open as unknown as Item[]) as unknown as typeof open;
+  const now = new Date(nowMs);
+  let n = 0;
+  return {
+    rows: ranked.map((r) => {
+      const sc = score(r as unknown as Item);
+      return { rank: sc == null ? null : ++n, title: r.title, team: r.team, stage: r.stage as "idea" | "building", impact: r.impact, reach: r.reach, confidence: r.confidence, effort: r.effort_days, score: sc, stale: isScoreStale(r as unknown as Item, now) };
+    }),
+    teams: teamsOf(rows),
+    counts: {
+      idea: rows.filter((r) => r.stage === "idea").length, building: rows.filter((r) => r.stage === "building").length, live: rows.filter((r) => r.stage === "live").length,
+      results: rows.filter((r) => r.stage === "live").reduce((t, r) => t + (r.log?.length ?? 0), 0),
+    },
+  };
+}
 
 export function seedSql(nowMs: number = Date.now()): string {
   const now = nowMs;

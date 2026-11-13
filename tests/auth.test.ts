@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { allMigrations } from "./migrations";
 import { SignJWT, exportJWK, generateKeyPair, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { authConfigFromEnv, cleanPicture, isAllowed, sign, SESSION_SECONDS, type AuthConfig } from "../src/server/auth";
+import { authConfigFromEnv, cleanPicture, isAllowed, renderSignin, sign, SESSION_SECONDS, type AuthConfig } from "../src/server/auth";
 import { migrate, pglite, type Db } from "../src/server/db";
 import { createHosted } from "../src/server/hosted";
 
@@ -469,5 +469,56 @@ describe("the settings", () => {
     expect(authConfigFromEnv({ ...ENV, PUBLIC_URL: "https://gtm-backlog.onrender.com/" }).config?.redirectUri).toBe("https://gtm-backlog.onrender.com/auth/google/callback");
     expect(authConfigFromEnv({ ...ENV, PUBLIC_URL: "http://localhost:8921" }).config?.secure).toBe(false);
     expect(cfg.secure).toBe(true);
+  });
+});
+
+/* ------------------------------------------- the sign-in page and your photo */
+
+describe("the sign-in page", () => {
+  const FULL = "<head><!--accent--></head><main><!--message--><!--queue--></main>";
+  it("fills the message slot escaped, the queue from the sample, and the accent from ACCENT", async () => {
+    const down = createHosted({ demoDb, realDb: async () => realDb, auth: cfg, signinHtml: FULL, accent: "#1D4ED8", fetch: googleFetch });
+    const html = await (await down.request(`${ORIGIN}/`)).text();
+    expect(html).toContain("--accent:#1D4ED8");
+    expect(html).toContain("Intent digest to Slack"); // generated from seed.ts, ranked first
+    expect(html.indexOf("Intent digest to Slack")).toBeLessThan(html.indexOf("CRM duplicate merge job"));
+    expect(html).not.toContain("<!--");
+    expect(renderSignin(FULL, "a <b> & \"c\"")).toContain('<p class="signin-msg" role="alert">a &lt;b&gt; &amp; &quot;c&quot;</p>');
+    const bad = createHosted({ demoDb, realDb: async () => realDb, auth: cfg, signinHtml: FULL, accent: "#FFEB3B", fetch: googleFetch });
+    expect(await (await bad.request(`${ORIGIN}/`)).text()).not.toContain("--accent:"); // too light for white text: ignored
+  });
+
+  it("answers a page visit with the sign-in page and the not-reachable sentence when the real database is down, keeping the API JSON", async () => {
+    const down = createHosted({ demoDb, realDb: async () => { throw new Error("ECONNREFUSED"); }, auth: cfg, signinHtml: FULL, fetch: googleFetch });
+    const page = await down.request(`${ORIGIN}/board`, { headers: { cookie: cookieHeader(session()) } });
+    expect(page.status).toBe(503);
+    expect(page.headers.get("cache-control")).toBe("no-store");
+    const html = await page.text();
+    expect(html).toContain("The backlog database is not reachable right now. Try again in a minute.");
+    expect(html).toContain("Intent digest to Slack");
+    const api = await down.request(`${ORIGIN}/api/state`, { headers: { cookie: cookieHeader(session()) } });
+    expect(api.status).toBe(503);
+    expect(((await api.json()) as { error: string }).error).toContain("not reachable");
+    // The demo still opens from that page, and a visitor with no session just sees the plain sign-in page.
+    const again = createHosted({ demoDb, realDb: async () => { throw new Error("ECONNREFUSED"); }, auth: cfg, signinHtml: FULL, fetch: googleFetch });
+    again.get("*", (c) => c.text("SPA"));
+    expect(await (await again.request(`${ORIGIN}/board`, { headers: { cookie: cookieHeader({ ...session(), [SPACE]: "demo" }) } })).text()).toBe("SPA");
+    const anon = await again.request(`${ORIGIN}/`);
+    expect(anon.status).toBe(200);
+    expect(await anon.text()).not.toContain("not reachable");
+  });
+});
+
+describe("your photo in the hosted app", () => {
+  const PNG = `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).toString("base64")}`;
+  it("is stored for the signed-in person in the real space only, never for the demo or by the write key", async () => {
+    const put = (cookies: Record<string, string>, headers: Record<string, string> = {}) => send("PUT", "/api/me/photo", { photo: PNG }, cookies, { "x-actor": "Visitor", ...headers });
+    expect((await put(session())).status).toBe(200);
+    const state = (await (await get("/api/state", session())).json()) as { meta: { photos: Record<string, string> } };
+    expect(state.meta.photos).toEqual({ "Bryan A": PNG });
+    expect((await put({ ...session(), [SPACE]: "demo" })).status).toBe(403); // viewing the demo: nobody has an address there
+    expect((await put({})).status).toBe(403); // anonymous demo visitor
+    expect((await put({}, { "x-write-key": "team-key", "x-actor": "n8n" })).status).toBe(403);
+    expect((await (await get("/api/state", {})).json() as { meta: { photos: object } }).meta.photos).toEqual({}); // the demo space never sees the real photos
   });
 });

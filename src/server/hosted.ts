@@ -12,6 +12,8 @@ import { Hono, type Context } from "hono";
 import { createApp, type Space } from "./app.ts";
 import { cleanPicture, crossSite, mountAuth, renderSignin, safeEqual, sessionFrom, viewingDemo, type AuthConfig } from "./auth.ts";
 import type { Db } from "./db.ts";
+import { signinAccentCss, signinQueueHtml } from "./signin-queue.ts";
+import { accentError, normalizeHex } from "../shared/settings.ts";
 
 export interface HostedDeps {
   demoDb: Db;
@@ -30,6 +32,8 @@ export interface HostedDeps {
 }
 
 const refuse = (message: string, status: 401 | 403 | 503) => Response.json({ error: message }, { status });
+const REAL_WAIT_MS = 8000;
+const UNREACHABLE = "The backlog database is not reachable right now. Try again in a minute.";
 const isPage = (path: string) => !path.startsWith("/api/") && !path.startsWith("/auth/") && !path.startsWith("/assets/") && !path.startsWith("/video/") && !/\.[a-z0-9]{2,5}$/i.test(path);
 
 export function createHosted(d: HostedDeps) {
@@ -37,20 +41,34 @@ export function createHosted(d: HostedDeps) {
   const auth = d.auth && d.realDb ? d.auth : null; // signing in is offered only when there is a real space to enter
   const app = new Hono();
 
-  const page = (message?: string) => renderSignin(d.signinHtml, message);
+  // The page needs no database: the picture is the sample's queue, the accent is the ACCENT variable's (else the stylesheet's own ink).
+  const accentHex = normalizeHex(d.accent);
+  const accent = signinAccentCss(accentHex && !accentError(accentHex) ? accentHex : null);
+  const page = (message?: string) => renderSignin(d.signinHtml, message, { queue: signinQueueHtml(now()), accent });
+  const realReachable = async (): Promise<boolean> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try { return await Promise.race([d.realDb!().then(() => true, () => false), new Promise<boolean>((r) => { timer = setTimeout(() => r(false), REAL_WAIT_MS); })]); } finally { clearTimeout(timer); }
+  };
   mountAuth(app, { cfg: auth, fetch: d.fetch ?? fetch, now, signinPage: page });
 
   // Visitors who are neither signed in nor in the demo see the sign-in page, wherever they land.
   app.use("*", async (c, next) => {
     if (!auth || (c.req.method !== "GET" && c.req.method !== "HEAD") || !isPage(new URL(c.req.url).pathname)) return next();
-    if (sessionFrom(c, auth, Math.floor(now() / 1000)) || viewingDemo(c, auth)) return next();
+    const user = sessionFrom(c, auth, Math.floor(now() / 1000));
+    if (user && !viewingDemo(c, auth)) {
+      // Signed in, so this page would open the real backlog. If its database cannot be reached, say so on the sign-in page
+      // (the demo button still works there); the API keeps answering in JSON.
+      const up = await realReachable();
+      return up ? next() : c.html(page(UNREACHABLE), 503, { "cache-control": "no-store" });
+    }
+    if (user || viewingDemo(c, auth)) return next();
     return c.html(page(), 200, { "cache-control": "no-store" });
   });
 
   const resolve = async (c: Context): Promise<Space | Response> => {
     const real = async (): Promise<Db | Response> => {
       if (!d.realDb) return refuse("The real backlog is not set up on this server.", 503);
-      try { return await d.realDb(); } catch (e) { console.error("Real database unavailable:", e); return refuse("The backlog database is not reachable right now. Try again in a minute.", 503); }
+      try { return await d.realDb(); } catch (e) { console.error("Real database unavailable:", e); return refuse(UNREACHABLE, 503); }
     };
     const meta = { signIn: Boolean(auth) };
 
@@ -67,7 +85,7 @@ export function createHosted(d: HostedDeps) {
     if (user && !viewingDemo(c, auth)) {
       if (c.req.method !== "GET" && crossSite(c, auth)) return refuse("That request came from another site, so it was not made.", 403);
       const db = await real();
-      return db instanceof Response ? db : { db, demo: false, actor: user.name, meta: { ...meta, space: "real", user: { name: user.name, email: user.email, picture: cleanPicture(user.picture) } } };
+      return db instanceof Response ? db : { db, demo: false, actor: user.name, email: user.email, meta: { ...meta, space: "real", user: { name: user.name, email: user.email, picture: cleanPicture(user.picture) } } };
     }
     return { db: d.demoDb, demo: true, meta: { ...meta, space: "demo", user: user ? { name: user.name, email: user.email, picture: cleanPicture(user.picture) } : null } };
   };

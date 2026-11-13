@@ -47,14 +47,14 @@ DATABASE_URL=postgresql://… WRITE_KEY=choose-a-secret npm start
 
 Migrations apply on start. Your database starts empty; add `SEED_SAMPLE=1` only if you want the sample backlog in it. With `WRITE_KEY` set, changes need that key, so leave it unset only on a private network.
 
-**Deploy to Render, one link with two spaces:** `render.yaml` runs `node src/server/node.ts --hosted` (health check `/api/health`). Everyone who is not signed in sees a page with two buttons:
+**Deploy to Render, one link with two spaces:** `render.yaml` runs `node src/server/node.ts --hosted` (health check `/api/health`). Everyone who is not signed in sees the demo's own ranked Queue (read from the sample data) with two buttons:
 
-- **Try the demo** opens the sample backlog (PGlite, inside the instance). Anyone can use it, edits stay in it, and it reloads every night at 06:00 UTC and on every start, so a sleeping free service wakes up fresh.
+- **Open the demo** opens the sample backlog (PGlite, inside the instance). Anyone can use it, edits stay in it, and it reloads every night at 06:00 UTC and on every start, so a sleeping free service wakes up fresh.
 - **Sign in with Google** opens the real backlog (Postgres at `DATABASE_URL`) for allowlisted accounts. No sample is ever loaded into it. A signed-in user can switch to the demo and back from the left rail.
 
 The two spaces share nothing. The space is chosen from the caller's credentials, never from anything the request names, so a demo visitor, or a request with a forged or expired cookie, cannot read or write the real space; tests cover this at the API.
 
-With `DATABASE_URL` or the Google settings missing, the app runs demo-only and opens straight on the demo, as before. Migrations for the real space run on start, under a database lock so two servers starting together cannot both migrate. If the real database is down, the demo keeps working and the real space answers "not reachable" until it is back (it retries after 15 seconds). `npm run migrate` still applies them by hand.
+With `DATABASE_URL` or the Google settings missing, the app runs demo-only and opens straight on the demo, as before. Migrations for the real space run on start, under a database lock so two servers starting together cannot both migrate. If the real database is down, the demo keeps working and a signed-in visitor gets the sign-in page with "The backlog database is not reachable right now" until it is back (it retries after 15 seconds; the API answers 503 JSON). `npm run migrate` still applies them by hand.
 
 ### Settings (environment only)
 

@@ -25,6 +25,9 @@
   --accent-hover: #3F3F46;
   --accent-ink: #FAFAFA;
   --bad: #B91C1C;
+  /* Google's own button colours (their brand rules for a light button), the only colours here that are not ours. */
+  --google-ink: #1F1F1F;
+  --google-line: #747775;
   --white: #FFFFFF;
   --row-hover: #F4F4F5;
   --row-active: #EAEAEC;
@@ -147,13 +150,69 @@ p { margin: 0; }
 .acct form { margin: 0; }
 .acct .btn { padding: 0 8px; }
 
-/* The sign-in page: the product name and two buttons. */
-.signin { min-height: 100vh; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; width: min(320px, calc(100% - 32px)); margin: 0 auto; padding-bottom: 8vh; }
-.signin form { margin: 0; }
-.signin-name { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font: var(--t-title); letter-spacing: -0.014em; }
-.signin-name .ws-mark { width: 24px; height: 24px; border-radius: 7px; }
-.signin-btn { width: 100%; height: 40px; font-size: 14px; }
-.signin-msg { margin: 0 0 4px; font: var(--t-data); color: var(--ink-1); font-weight: 500; overflow-wrap: anywhere; }
+/* The sign-in page: the demo's own ranked Queue is the page. A narrow column holds the name, one line, Open the demo (the one
+   primary) and Sign in with Google, a deliberate pair: same height, radius, padding, type, press and focus. The rows come from the
+   sample data on the server (src/server/signin-queue.ts). It uses the app's classes and tokens, so the accent is the install's. */
+.la { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 0 72px; max-width: 1344px; margin: 0 auto; padding: 80px 48px 64px; align-items: start; }
+.la-side { position: sticky; top: 80px; display: flex; flex-direction: column; align-items: stretch; }
+.la-side form { margin: 0; }
+.la-name { display: flex; align-items: center; gap: 10px; font: var(--t-title); letter-spacing: -0.02em; }
+.la-name .ws-mark { width: 24px; height: 24px; border-radius: 7px; }
+.la-what { margin-top: 10px; font: var(--t-body); color: var(--ink-2); text-wrap: balance; }
+.signin-msg { order: 3; margin: 24px 0 -8px; font: 600 13px/19px var(--sans); color: var(--ink-1); overflow-wrap: anywhere; }
+.f-demo { order: 4; margin-top: 28px !important; }
+.f-google { order: 5; margin-top: 12px !important; }
+.btn.signin-btn { width: 100%; height: 40px; padding: 0 12px; font-size: 14px; }
+/* Google's button on a light surface: white fill, a thin border, their ink, the four-colour G at 18px, 10px before the label. Only the colours are Google's. */
+.btn.google { gap: 10px; background: var(--white); color: var(--google-ink); box-shadow: inset 0 0 0 1px var(--google-line); }
+.btn.google:hover:not(:disabled) { background: var(--hover); box-shadow: inset 0 0 0 1px var(--google-ink); }
+.btn.google svg { width: 18px; height: 18px; }
+.la-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 40px; max-width: 560px; }
+.la-figs > div { display: grid; gap: 4px; align-content: start; padding: 0 0 0 20px; border-left: 1px solid var(--line); }
+.la-figs > div:first-child { padding-left: 0; border-left: 0; }
+.la-figs .fig { font: 500 20px/26px var(--mono); letter-spacing: -0.03em; color: var(--ink-1); }
+.la .grid th.num, .la .grid td.num { padding-left: 8px; padding-right: 8px; }
+.la-head { margin-bottom: 16px; }
+.la-head h2 { font: var(--t-section); }
+.la .grid tbody tr { cursor: default; }
+.la .grid tbody tr:hover td, .la .grid tbody tr:active td { background: none; }
+.la .grid td.title > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--ink-1); }
+.la .grid td.stg { color: var(--ink-2); }
+.la .grid td.stg.on { color: var(--ink-1); font-weight: 600; }
+.la .grid td.sc { padding-right: 0; }
+.la .grid th:last-child { padding-right: 0; }
+.la .grid th:first-child, .la .grid td.rank { padding-left: 0; }
+.la-phone { display: none; }
+@media (max-width: 1100px) {
+  .la { grid-template-columns: 240px minmax(0, 1fr); gap: 0 48px; padding: 56px 32px; }
+  .la .grid .in, .la .grid .h-in { display: none; }
+}
+@media (max-width: 760px) {
+  .la { display: block; padding: 0 16px 40px; }
+  .la-side { position: static; padding-top: 16px; }
+  .la-name { font: 600 14px/20px var(--sans); letter-spacing: -0.006em; gap: 9px; }
+  .la-name .ws-mark { width: 20px; height: 20px; border-radius: 6px; }
+  .la-what { margin-top: 24px; font: var(--t-title); letter-spacing: -0.02em; color: var(--ink-1); }
+  .signin-msg { margin: 16px 0 -4px; }
+  .f-demo { margin-top: 20px !important; }
+  .btn.signin-btn { height: 44px; }
+  .la-ledger { margin-top: 36px; }
+  .la-figs { margin-bottom: 28px; }
+  .la-figs > div { padding-left: 12px; }
+  .la-head { margin-bottom: 4px; }
+  .la-desk { display: none; }
+  .la-phone { display: inline; }
+  .la .grid thead { display: none; }
+  .la .grid, .la .grid tbody { display: block; }
+  .la .grid tr { display: grid; grid-template-columns: 28px auto auto minmax(0, 1fr) auto; column-gap: 0; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .la .grid tr:nth-child(n+7) { display: none; }
+  .la .grid td { display: block; padding: 0; border: 0; }
+  .la .grid td.rank { grid-row: 1 / 3; width: auto; }
+  .la .grid td.title { grid-column: 2 / 5; width: auto; max-width: none; min-width: 0; }
+  .la .grid td.team { grid-column: 2; grid-row: 2; font: var(--t-meta); color: var(--ink-3); padding-right: 12px; }
+  .la .grid td.stg { grid-column: 3; grid-row: 2; font: var(--t-meta); }
+  .la .grid td.sc { grid-column: 5; grid-row: 1; padding-left: 12px; }
+}
 .me .hint { margin-left: auto; color: var(--ink-4); font: var(--t-meta); }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
@@ -331,6 +390,9 @@ table.grid { width: 100%; border-collapse: collapse; font: var(--t-data); }
 .meter + .meter { border-left: 1px solid var(--line); }
 .meter .fig { font: 500 20px/26px var(--mono); letter-spacing: -0.03em; color: var(--ink-1); }
 .meter .fig.attn { font-weight: 600; }
+/* A figure stays on one line; its unit is smaller and muted so the digits carry the weight (T10). */
+.meter .fig { white-space: nowrap; }
+.meter .fig .unit { font: 400 13px/1 var(--mono); letter-spacing: 0; color: var(--ink-3); }
 
 /* ------------------------------------------------------------------ shipped */
 
@@ -525,6 +587,9 @@ table.grid { width: 100%; border-collapse: collapse; font: var(--t-data); }
 .pop-foot { font: var(--t-meta); color: var(--ink-3); min-height: 18px; }
 .pop { position: fixed; z-index: 45; width: 196px; display: grid; gap: 10px; padding: 12px; border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--overlay); animation: fade 120ms ease; }
 .pop-head { font: 500 13px/18px var(--sans); color: var(--ink-1); }
+.photo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.photo-row .av.lg { width: 44px; height: 44px; font-size: 16px; margin-right: 4px; }
+.set-block .error-text:empty { display: none; }
 .hex-row { display: grid; grid-template-columns: minmax(0, 200px) auto; justify-content: start; gap: 10px; align-items: end; }
 .hex-row .hex-msg { grid-column: 1 / -1; min-height: 18px; }
 .hex-row .hex-msg:empty { display: none; }
