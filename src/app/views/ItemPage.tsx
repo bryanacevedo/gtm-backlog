@@ -194,7 +194,7 @@ function ScoreSection({ item, now }: { item: Item; now: Date }) {
             <div className="meter"><span className="label">Impact</span><span className="fig">{fig(item.impact)}</span></div>
             <div className="meter"><span className="label">Reach</span><span className="fig">{fig(item.reach)}</span></div>
             <div className="meter"><span className="label">Confidence</span><span className="fig">{fig(item.confidence, "%")}</span></div>
-            <div className="meter"><span className="label">Effort</span><span className="fig">{fig(item.effort_days, "d")}</span></div>
+            <div className="meter"><span className="label">Effort</span><span className="fig">{fig(item.effort_days, item.effort_days === 1 ? " day" : " days")}</span></div>
           </div>
           {s != null && item.scored_at && (
             <div className="foot">

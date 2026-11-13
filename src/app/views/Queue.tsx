@@ -79,7 +79,7 @@ function Row({ item, n, focused, flashed, now, onFocus }: { item: Item; n: numbe
       <td className="title pin pin-2"><a href={href} onClick={linkClick(href)} title={item.title}>{item.title}</a></td>
       <td className="team"><Team name={item.team} /></td>
       <td className="stage-col"><StageLabel stage={item.stage} /></td>
-      {cell(item.impact)}{cell(item.reach, "/wk")}{cell(item.confidence, "%")}{cell(item.effort_days, "d")}
+      {cell(item.impact)}{cell(item.reach, "/wk")}{cell(item.confidence, "%")}{cell(item.effort_days, item.effort_days === 1 ? " day" : " days")}
       <td className="num score-col" title={stale ? `Scored ${daysSince(item.scored_at!, now)} days ago. Rescore on the item page.` : undefined}>
         {s == null ? <span className="score-none">Unscored</span> : <span className={`score${stale ? " stale" : ""}`}>{fmtScore(s)}</span>}
       </td>
