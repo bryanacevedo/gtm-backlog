@@ -8,7 +8,12 @@
                      a btn or button class, or a filled element 28px or taller)
      idle-motion     an animation named or used on pulse, blink or breath
      warm-warning    amber, orange or brown text or background (hue 20 to 50, saturation over 40%) on late, over, overdue, warn, warning, due or alert
-     text-link-cta   an anchor or link styled as a link whose text starts "Open the", "See all", "View all", "View more", "Show all", "Go to", "Learn more"
+     text-link-cta   an anchor or link styled as a link whose text starts "Open", "Undo", "Source thread", "System", "See all", "View all", "View more", "Show all", "Go to", "Learn more"
+     state-colour    a coloured (saturation over 20%) text or background on a silent, stale, declined, decline, retired or live class: state is weight and ink, never colour
+     status-glyph    a <Mark> component or a mark, glyph or status-icon class in markup: a shape written before a status word
+     underlined-action  a link, btn or button rule that underlines its text at rest (hover underlines excepted)
+     explainer       a sub, hint, caption or note element (or a sub= prop) whose text is a sentence of five words or more
+     type-sizes      a stylesheet that uses more than four distinct font sizes (avatar initials excepted)
      allow-reason    a `design-lint: allow` comment with no reason after it
 
    Exempt a line with the comment `design-lint: allow <reason>` (CSS or TSX), on the rule or tag, or on the line above it. The reason is required.
@@ -161,6 +166,7 @@ const RADIUS_EXEMPT = /avatar|logo|toggle|switch|progress|track|fill|(^|[^a-z])b
 // Real action buttons are not pills: Bryan, 2026-11-12, "solid colored buttons, big, they dont look ai".
 const BUTTON_RE = /btn|button/i;
 const MOTION_RE = /pulse|blink|breath/i;
+const STATE_WORDS = new Set(["silent", "stale", "declined", "decline", "retired", "live"]);
 const WARM_WORDS = new Set(["late", "over", "overdue", "warn", "warning", "due", "alert"]);
 const hasFill = (d) => ["background", "background-color"].some((p) => d.has(p) && !/^(none|transparent|inherit|initial|unset|0 0)$/i.test(d.get(p).trim()));
 const px = (v) => {
@@ -221,6 +227,15 @@ function lintCss(sheets, vars, allowFor, out, shapes) {
     const anim = [d.get("animation"), d.get("animation-name")].filter(Boolean).join(" ");
     if (anim && !/^none\b/.test(anim.trim()) && (MOTION_RE.test(anim) || [...ws].some((x) => MOTION_RE.test(x)) && /infinite/.test(anim)))
       out.push({ file, line: g.line, rule: "idle-motion", snippet: squash(`${part} { animation: ${anim} }`) });
+    // 4. state-colour and underlined-action
+    if ([...ws].some((x) => STATE_WORDS.has(x))) {
+      for (const p of ["color", "background", "background-color"]) {
+        if (!d.has(p)) continue;
+        if (resolveColors(d.get(p), vars).some((c) => c.s > 20)) { out.push({ file, line: g.line, rule: "state-colour", snippet: squash(`${part} { ${p}: ${d.get(p)} }`) }); break; }
+      }
+    }
+    if (!part.includes(":") && [...ws].some((x) => ["link", "btn", "button"].includes(x)) && /underline/.test(d.get("text-decoration") ?? d.get("text-decoration-line") ?? ""))
+      out.push({ file, line: g.line, rule: "underlined-action", snippet: squash(`${part} { text-decoration: ${d.get("text-decoration") ?? d.get("text-decoration-line")} }`) });
     // 3. warm-warning
     if ([...ws].some((x) => WARM_WORDS.has(x))) {
       for (const p of ["color", "background", "background-color"]) {
@@ -231,8 +246,35 @@ function lintCss(sheets, vars, allowFor, out, shapes) {
   }
 }
 
+// ---------- type sizes ----------
+// Four sizes is the whole scale (T11). Avatar initials sit in a circle and are not type, so selectors naming an avatar are not counted.
+const SIZE_EXEMPT = /(^|[^a-z])(av|avatar)([^a-z]|$)/i;
+function lintSizes(sheets, out) {
+  for (const { file, raw } of sheets) {
+    if (!file.endsWith(".css")) continue;
+    const sizes = new Map();
+    for (const b of parseCss(cssOf(file, raw))) {
+      if (SIZE_EXEMPT.test(b.selector)) continue;
+      for (const [k, v] of b.decls) {
+        if (k !== "font" && k !== "font-size" && !k.startsWith("--t-")) continue;
+        const m = k === "font-size" ? v.match(/^([\d.]+)(px|rem)?/) : v.match(/(?:^|\s)([\d.]+)(px|rem)(?:\/|\s|$)/);
+        if (!m) continue;
+        const n = (m[2] === "rem" ? +m[1] * 16 : +m[1]);
+        if (!sizes.has(n)) sizes.set(n, b.line);
+      }
+    }
+    if (sizes.size > 4) {
+      const list = [...sizes.keys()].sort((a, b) => a - b);
+      out.push({ file, line: Math.max(...sizes.values()), rule: "type-sizes", snippet: `${sizes.size} font sizes (${list.join(", ")}px); the limit is four` });
+    }
+  }
+}
+
 // ---------- TSX / HTML ----------
-const CTA = /^(open the|see all|view all|view more|show all|go to|learn more)\b/i;
+const CTA = /^(open\b|undo\b|source thread\b|system\b|see all|view all|view more|show all|go to|learn more)/i;
+const EXPLAIN_CLASS = /(^|[\s"'`{])(sub|hint|caption|note|explainer|blurb)([\s"'`}]|$)/;
+const STATUS_GLYPH_CLASS = /(^|[\s"'`{])(mark|glyph|status-icon|status-glyph)([\s"'`}]|$)/;
+const sentence = (t) => t.trim().split(/\s+/).length >= 5 && /[.!?](\s|$)/.test(t.trim());
 function lintMarkup(file, raw, ok, out, shapes) {
   const src = raw
     .replace(/\/\*[\s\S]*?\*\//g, blank)
@@ -245,6 +287,33 @@ function lintMarkup(file, raw, ok, out, shapes) {
     const line = lineAt(src, m.index);
     if (isAllowed(ok, line, line + m[0].split("\n").length - 1)) continue;
     out.push({ file, line, rule: "dot", snippet: squash(`<... className="${m[1]}" style={{ ${m[2].trim()} }}> (${shapes.get(cls).w}px round)`) });
+  }
+  // status-glyph: a <Mark> component, or an element given a mark/glyph class
+  for (const m of src.matchAll(/<(Mark)(?=[\s/>])|<\w+\s[^<>]*?(?:className|class)=\{?["'`]([^"'`]*)["'`]/g)) {
+    const hit = m[1] === "Mark" || (m[2] && STATUS_GLYPH_CLASS.test(m[2]) && /<svg|<span|<i\b/.test(m[0]));
+    if (!hit) continue;
+    const line = lineAt(src, m.index);
+    if (isAllowed(ok, line, line)) continue;
+    out.push({ file, line, rule: "status-glyph", snippet: squash(m[0]) });
+  }
+  // explainer: sub="..." props, and sentences inside sub, hint, caption or note elements
+  for (const m of src.matchAll(/\bsub=(?:"([^"]*)"|\{\s*(?:"([^"]*)"|`([^`$]*)`)\s*\})/g)) {
+    const text = m[1] ?? m[2] ?? m[3] ?? "";
+    const line = lineAt(src, m.index);
+    if (!sentence(text) || isAllowed(ok, line, line)) continue;
+    out.push({ file, line, rule: "explainer", snippet: squash(`sub="${text}"`) });
+  }
+  for (const m of src.matchAll(/<(\w+)\s[^<>]*?(?:className|class)=(?:"([^"]*)"|\{`([^`]*)`\})[^<>]*>/g)) {
+    const cls = m[2] ?? m[3] ?? "";
+    if (!EXPLAIN_CLASS.test(` ${cls} `)) continue;
+    const from = m.index + m[0].length, end = src.indexOf(`</${m[1]}>`, from);
+    if (end < 0) continue;
+    const body = src.slice(from, end);
+    const lits = [...body.matchAll(/"([^"]*)"|`([^`$]*)`/g)].map((x) => x[1] ?? x[2]).concat(body.replace(/\{[^}]*\}/g, " ").split(/[<>]/).filter((x) => x.trim()));
+    const text = lits.find(sentence);
+    const line = lineAt(src, m.index);
+    if (!text || isAllowed(ok, line, line + body.split("\n").length - 1)) continue;
+    out.push({ file, line, rule: "explainer", snippet: squash(`<${m[1]} className="${cls}"> ${text}`) });
   }
   for (const m of src.matchAll(/<(a|button|[A-Z]\w*Link|Link)(?=[\s>])/g)) {
     // Opening tag: scan to the closing > outside braces and quotes.
@@ -284,8 +353,7 @@ function loadOrder(files) {
   return css.sort((a, b) => rank(a) - rank(b) || a.rel.localeCompare(b.rel));
 }
 
-export function violations() {
-  const files = sourceFiles().map((f) => ({ f, rel: relative(ROOT, f), raw: readFileSync(f, "utf8") }));
+export function lintFiles(files) {
   const out = [], allow = new Map();
   for (const { rel, raw } of files) allow.set(rel, allowedLines(raw, out, rel));
   const sheets = loadOrder(files).map((x) => ({ file: x.rel, raw: x.raw }));
@@ -298,8 +366,13 @@ export function violations() {
     }
   const shapes = new Map();
   lintCss(sheets, vars, (file) => allow.get(file), out, shapes);
+  lintSizes(sheets, out);
   for (const { f, rel, raw } of files) if (!f.endsWith(".css")) lintMarkup(rel, raw, allow.get(rel), out, shapes);
   return out.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.rule.localeCompare(b.rule));
+}
+
+export function violations() {
+  return lintFiles(sourceFiles().map((f) => ({ f, rel: relative(ROOT, f), raw: readFileSync(f, "utf8") })));
 }
 
 const key = (v) => `${v.file}\t${v.rule}\t${v.snippet}`;
