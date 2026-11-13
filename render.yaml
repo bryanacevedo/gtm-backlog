@@ -1,0 +1,19 @@
+# The public demo: sample requests only, no keys. Its database (PGlite) lives in the running
+# instance, so every restart, including the wake-up after the free plan's idle sleep, is a fresh copy.
+services:
+  - type: web
+    name: gtm-backlog
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node src/server/node.ts --demo
+    healthCheckPath: /api/health
+    envVars:
+      # Node 24 needs about 840 MB to start the demo database; Node 26 needs about 300.
+      - key: NODE_VERSION
+        value: 26.13.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=150 --max-semi-space-size=8
