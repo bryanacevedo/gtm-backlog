@@ -17,3 +17,5 @@ services:
         value: 0.0.0.0
       - key: NODE_OPTIONS
         value: --max-old-space-size=150 --max-semi-space-size=8
+      - key: PUBLIC_DEMO
+        value: "1"
