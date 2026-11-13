@@ -191,7 +191,7 @@ function ScoreSection({ item, now }: { item: Item; now: Date }) {
   const s = score(item);
   const stale = isScoreStale(item, now);
   const save = async () => { setBusy(true); const ok = await patchItem(item.id, { ...d, confirm_score: true }); setBusy(false); if (ok) setEditing(false); };
-  const fig = (v: number | null, unit = "") => (v == null ? <span className="nil">–</span> : <>{fmtNum(v)}{unit}</>);
+  const fig = (v: number | null, unit = "") => (v == null ? <span className="nil">–</span> : <>{fmtNum(v)}{unit && <span className="unit">{unit}</span>}</>);
 
   return (
     <section className="sect" aria-labelledby="score">
