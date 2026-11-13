@@ -41,3 +41,8 @@ Short records of the choices that shaped gtm-backlog: what was decided, what els
 
 **Decision:** `scripts/audit-layout.mjs` loads every view in a real browser at 1440, 1024, 412, 360 and 330px (the last approximates a phone with enlarged text). It fails on misaligned column edges, mismatched text baselines, text spilling out of its box, or sideways scroll.
 **Why:** a screenshot that looks fine can hide a 3px baseline drift, and phones with bigger system text break layouts that a desktop browser never shows. The audit found 59 problems the first time it ran.
+
+## 8. An unopened request is told by weight, not a dot
+
+**Decision:** in Triage, a request nobody has opened yet is set in semibold; an opened one is regular. The small dot beside its age is gone. Team colours (`TEAM_COLOR`, `.tdot`) stay: they identify a team, they do not signal a state.
+**Why:** a coloured or ink dot before a word is a banned AI tell (BRYAN-DESIGN-INSTRUMENT.md); weight carries the same information. Bryan approved it on 2026-11-12, and `docs/DESIGN-LINT-BASELINE.txt` is now empty. Screen readers still hear "(not opened yet)".

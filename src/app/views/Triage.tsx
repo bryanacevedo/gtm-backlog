@@ -80,11 +80,11 @@ export function Triage({ shared }: { shared: Shared }) {
               {tab === "waiting" && <button className="btn quiet compact" type="button" onClick={shared.openNew}>New request</button>}
             </div>
           ) : list.map((r) => (
-            <button key={r.id} type="button" className={`req${leaving === r.id ? " leaving" : ""}${tab === "declined" ? " closed" : ""}`} role="option" data-req={r.id}
+            <button key={r.id} type="button" className={`req${leaving === r.id ? " leaving" : ""}${tab === "declined" ? " closed" : ""}${tab === "waiting" ? (seen.current.has(r.id) ? " seen" : " unseen") : ""}`} role="option" data-req={r.id}
               aria-selected={sel?.id === r.id} onClick={() => { setSelId(r.id); setOpen(true); }}>
               <Avatar name={r.requester} />
-              <span className="t">{r.title}</span>
-              <span className="age">{agoShort(tab === "waiting" ? r.created_at : r.stage_changed_at)}{tab === "waiting" && !seen.current.has(r.id) && <span className="new" aria-label="Not opened yet" />}</span>
+              <span className="t">{r.title}{tab === "waiting" && !seen.current.has(r.id) && <span className="sr-only"> (not opened yet)</span>}</span>
+              <span className="age">{agoShort(tab === "waiting" ? r.created_at : r.stage_changed_at)}</span>
               <span className="meta">{r.requester} · <Team name={r.team} /></span>
             </button>
           ))}
