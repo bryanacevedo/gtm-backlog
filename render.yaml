@@ -1,5 +1,7 @@
-# The public demo: sample requests only, no keys. Its database (PGlite) lives in the running
-# instance, so every restart, including the wake-up after the free plan's idle sleep, is a fresh copy.
+# One link, two spaces. The demo (sample requests, PGlite inside the instance) is open to everyone and is
+# a fresh copy on every restart, including the wake-up after the free plan's idle sleep. The real backlog
+# (Postgres at DATABASE_URL) opens only for signed-in Google accounts on the allowlist. With the settings
+# below left unset, the app runs the demo alone.
 services:
   - type: web
     name: gtm-backlog
@@ -7,7 +9,7 @@ services:
     plan: free
     autoDeploy: true
     buildCommand: npm ci --include=dev && npm run build
-    startCommand: node src/server/node.ts --demo
+    startCommand: node src/server/node.ts --hosted
     healthCheckPath: /api/health
     envVars:
       # Node 24 needs about 840 MB to start the demo database; Node 26 needs about 300.
@@ -19,3 +21,20 @@ services:
         value: --max-old-space-size=150 --max-semi-space-size=8
       - key: PUBLIC_DEMO
         value: "1"
+      # Sign-in and the real space. Set these in the Render dashboard (values never go in this file).
+      - key: PUBLIC_URL
+        value: https://gtm-backlog.onrender.com
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: ALLOWED_EMAILS
+        sync: false
+      - key: ALLOWED_DOMAIN
+        sync: false
+      - key: WRITE_KEY
+        sync: false

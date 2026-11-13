@@ -4,15 +4,32 @@
    and records an event, so the activity feed is the audit trail. The schema
    enforces the same rules a second time (migrations/0001_init.sql). */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { Db } from "./db.ts";
+import { safeEqual } from "./safe.ts";
 import {
   TEAMS, TOUCHES, label, moveError, validateInputs,
   type EventRow, type Item, type ShipLogEntry, type Stage,
 } from "../shared/domain.ts";
 
-export interface AppConfig { writeKey?: string; demo: boolean }
-type Ctx = { Variables: { actor: string } };
+/** Which data space a request reaches, decided by the caller's credentials and nothing the request names. */
+export interface Space {
+  db: Db;
+  demo: boolean;
+  /** When set, writes are logged under this name and the x-actor header is ignored (a signed-in user). */
+  actor?: string;
+  /** Put in front of a name the caller supplies (scripts), so it cannot pass for a signed-in person. */
+  actorPrefix?: string;
+  /** Merged into the meta of /api/state (who is signed in, which space, what the header may offer). */
+  meta?: Record<string, unknown>;
+}
+export interface AppConfig {
+  writeKey?: string;
+  demo: boolean;
+  /** Hosted mode: choose the space per request (or answer with a Response, such as a refusal). */
+  resolve?: (c: Context) => Promise<Space | Response>;
+}
+type Ctx = { Variables: { actor: string; space: Space } };
 
 const ITEM_COLS = `id, title, problem, team, requester, touches, link, stage::text AS stage, owner, impact, reach, confidence,
   effort_days, scored_at, scored_by, system_url, target_date::text AS target_date, decision_note, merged_into, live_at,
@@ -21,10 +38,11 @@ const ITEM_COLS = `id, title, problem, team, requester, touches, link, stage::te
 const newId = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 const isUrl = (s: unknown) => typeof s === "string" && /^https?:\/\/\S+$/.test(s);
 const text = (s: unknown) => (typeof s === "string" ? s.trim() : "");
-const bad = (msg: string, status: 400 | 401 | 404 | 409 = 400) => Response.json({ error: msg }, { status });
+const bad = (msg: string, status: 400 | 401 | 403 | 404 | 409 | 503 = 400) => Response.json({ error: msg }, { status });
 
 export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
   const app = new Hono<Ctx>();
+  const dbOf = (c: Context<Ctx>) => c.get("space").db;
 
   const one = async (q: Db["query"], id: string) =>
     (await q<Item>(`SELECT ${ITEM_COLS} FROM items WHERE id = $1`, [id]))[0] ?? null;
@@ -34,10 +52,14 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
   /* ---------------------------------------------------------- write gate */
 
   app.use("/api/*", async (c, next) => {
+    const space = cfg.resolve ? await cfg.resolve(c) : { db: await getDb(), demo: cfg.demo };
+    if (space instanceof Response) return space;
+    c.set("space", space);
     if (c.req.method !== "GET") {
-      if (cfg.writeKey && c.req.header("x-write-key") !== cfg.writeKey)
+      if (!cfg.resolve && cfg.writeKey && !safeEqual(c.req.header("x-write-key") ?? "", cfg.writeKey))
         return bad("This backlog needs the team write key to make changes.", 401);
-      const actor = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
+      const given = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
+      const actor = space.actor ?? (given ? (space.actorPrefix ?? "") + given : "");
       if (!actor) return bad("Tell the backlog who you are before making changes.");
       c.set("actor", actor.slice(0, 60));
     }
@@ -55,17 +77,17 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
   /* ---------------------------------------------------------------- read */
 
   app.get("/api/state", async (c) => {
-    const db = await getDb();
+    const db = dbOf(c);
     const [items, shipLog, events] = await Promise.all([
       db.query<Item>(`SELECT ${ITEM_COLS} FROM items`),
       db.query<ShipLogEntry>("SELECT id, item_id, date::text AS date, metric, value, unit, note, source_url, created_at FROM ship_log ORDER BY date DESC, created_at DESC"),
       db.query<EventRow>("SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400"),
     ]);
-    return c.json({ items, shipLog, events, meta: { demo: cfg.demo, writeKey: Boolean(cfg.writeKey), now: new Date().toISOString() } });
+    return c.json({ items, shipLog, events, meta: { demo: c.get("space").demo, writeKey: !cfg.resolve && Boolean(cfg.writeKey), now: new Date().toISOString(), ...c.get("space").meta } });
   });
 
   app.get("/api/health", async (c) => {
-    const db = await getDb();
+    const db = dbOf(c);
     const [r] = await db.query<{ v: string }>("SELECT current_setting('server_version') AS v");
     return c.json({ ok: true, postgres: r?.v });
   });
@@ -83,7 +105,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const link = text(b.link) || null;
     if (link && !isUrl(link)) return bad("The link must start with http:// or https://.");
     const id = newId("bl"), actor = c.get("actor");
-    const db = await getDb();
+    const db = dbOf(c);
     const item = await db.tx(async (q) => {
       await q("INSERT INTO items (id, title, problem, team, requester, touches, link) VALUES ($1, $2, $3, $4, $5, $6, $7)",
         [id, title, problem, team, requester, touches, link]);
@@ -117,7 +139,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     if (patch.target_date != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(patch.target_date))) return bad("Use a date like 2026-12-01.");
 
     const actor = c.get("actor");
-    const db = await getDb();
+    const db = dbOf(c);
     const result = await db.tx(async (q) => {
       const item = await one(q, c.req.param("id"));
       if (!item) return { error: bad("That item no longer exists.", 404) };
@@ -145,7 +167,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const to = b.to as Stage;
     if (b.system_url && !isUrl(b.system_url)) return bad("The system link must start with http:// or https://.");
     const actor = c.get("actor");
-    const db = await getDb();
+    const db = dbOf(c);
     const result = await db.tx(async (q) => {
       // Lock the row so two people moving the same card cannot both win.
       const [locked] = await q<{ id: string }>("SELECT id FROM items WHERE id = $1 FOR UPDATE", [c.req.param("id")]);
@@ -193,7 +215,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const source = text(b.source_url) || null;
     if (source && !isUrl(source)) return bad("The source must start with http:// or https://.");
     const actor = c.get("actor");
-    const db = await getDb();
+    const db = dbOf(c);
     const result = await db.tx(async (q) => {
       const item = await one(q, c.req.param("id"));
       if (!item) return { error: bad("That item no longer exists.", 404) };

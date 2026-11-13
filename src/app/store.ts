@@ -9,7 +9,7 @@ export interface Snapshot {
   items: Item[];
   shipLog: ShipLogEntry[];
   events: EventRow[];
-  meta: { demo: boolean; writeKey: boolean; now: string };
+  meta: { demo: boolean; writeKey: boolean; now: string; space?: "demo" | "real"; user?: { name: string; email: string } | null; signIn?: boolean };
 }
 
 export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void }
@@ -83,7 +83,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export async function load() {
   try {
     const data = await call<Snapshot>("GET", "/api/state");
-    set({ data, loadError: null });
+    // In the real space the server logs changes under the signed-in name, so the browser never asks for one.
+    set({ data, loadError: null, ...(data.meta.space === "real" && data.meta.user ? { actor: data.meta.user.name } : {}) });
   } catch (e) {
     set({ loadError: (e as Error).message });
   }

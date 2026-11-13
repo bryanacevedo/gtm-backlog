@@ -27,6 +27,7 @@ export function App() {
   const data = useStore((s) => s.data);
   const loadError = useStore((s) => s.loadError);
   const actor = useStore((s) => s.actor);
+  const meta = data?.meta;
   useStore(() => actorPrompt.open);
   const [newOpen, setNewOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -79,7 +80,7 @@ export function App() {
     <div className="shell">
       <a className="sr-only" href="#main">Skip to content</a>
       <nav className="rail" aria-label="Workspace">
-        <div className="ws"><span className="ws-mark" aria-hidden="true"><i /></span>Acme GTM</div>
+        <div className="ws"><span className="ws-mark" aria-hidden="true"><i /></span>{meta?.space === "real" ? "GTM Backlog" : "Acme GTM"}{meta?.demo && <span className="env">Demo</span>}</div>
         <button className="new-btn" type="button" onClick={openNew} aria-label="New request"><Icon.plus /><span>New request</span><kbd>C</kbd></button>
         {NAV.map((n) => (
           <a key={n.view} href={n.path} className="nav-link" aria-current={route.view === n.view && !(n.view === "queue" && activeTeam) ? "page" : undefined} onClick={linkClick(n.path)}>
@@ -97,18 +98,26 @@ export function App() {
           );
         })}
         <div className="rail-foot">
-          <button className="me" type="button" onClick={() => setNameEditing(true)}>
-            <Avatar name={actor} size="sm" />
-            <span>{actor ?? "Add your name"}</span>
-            <span className="hint">{actor ? "Change" : ""}</span>
-          </button>
+          {meta?.demo && <span className="env env-phone">Demo</span>}
+          {meta?.space === "real" && meta.user ? (
+            <div className="me fixed"><Avatar name={meta.user.name} size="sm" /><span>{meta.user.name}</span></div>
+          ) : (
+            <button className="me" type="button" onClick={() => setNameEditing(true)}>
+              <Avatar name={actor} size="sm" />
+              <span>{actor ?? "Add your name"}</span>
+              <span className="hint">{actor ? "Change" : ""}</span>
+            </button>
+          )}
+          {(meta?.user || meta?.signIn) && (
+            <div className="acct">
+              {meta.user && <AuthButton action="/auth/space" field={{ space: meta.space === "demo" ? "real" : "demo" }}>{meta.space === "demo" ? "My backlog" : "View demo"}</AuthButton>}
+              {meta.user ? <AuthButton action="/auth/signout">Sign out</AuthButton> : <AuthButton action="/auth/space" field={{ space: "real" }}>Sign in</AuthButton>}
+            </div>
+          )}
         </div>
       </nav>
 
       <div className="main">
-        {data?.meta.demo && (
-          <div className="demo-band"><b>Demo workspace.</b> Sample data for a made-up GTM team. Edit anything; it resets every night.</div>
-        )}
         <main id="main" className={`page${route.view === "triage" ? " full" : ""}`} tabIndex={-1} key={route.view === "item" ? `item-${route.id}` : route.view}>
           {loadError ? (
             <div className="load-error"><p>{loadError}</p><button className="btn quiet" type="button" onClick={load}>Try again</button></div>
@@ -149,6 +158,16 @@ export function App() {
       )}
       <Toasts />
     </div>
+  );
+}
+
+/** A real button inside a small form: the server sets the cookie and sends the browser back to the root. */
+function AuthButton({ action, field, children }: { action: string; field?: Record<string, string>; children: string }) {
+  return (
+    <form method="post" action={action}>
+      {Object.entries(field ?? {}).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+      <button className="btn text compact" type="submit">{children}</button>
+    </form>
   );
 }
 

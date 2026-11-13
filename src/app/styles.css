@@ -117,11 +117,24 @@ p { margin: 0; }
 .rail-foot { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
 .me { display: flex; align-items: center; gap: 9px; width: 100%; height: 34px; padding: 0 8px; border: 0; background: none; border-radius: var(--r-sm); color: var(--ink-2); text-align: left; transition: background-color 150ms ease; }
 .me:hover { background: var(--hover); }
+.me.fixed { cursor: default; }
+.me.fixed:hover { background: none; }
+.env { margin-left: auto; font: 500 12px/1 var(--sans); color: var(--ink-3); }
+.env-phone { display: none; }
+.acct { display: flex; gap: 2px; padding: 4px 0 0; }
+.acct form { margin: 0; }
+.acct .btn { padding: 0 8px; }
+
+/* The sign-in page: the product name and two buttons. */
+.signin { min-height: 100vh; display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 10px; width: min(320px, calc(100% - 32px)); margin: 0 auto; padding-bottom: 8vh; }
+.signin form { margin: 0; }
+.signin-name { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font: var(--t-title); letter-spacing: -0.014em; }
+.signin-name .ws-mark { width: 24px; height: 24px; border-radius: 7px; }
+.signin-btn { width: 100%; height: 40px; font-size: 14px; }
+.signin-msg { margin: 0 0 4px; font: var(--t-data); color: var(--ink-1); font-weight: 500; overflow-wrap: anywhere; }
 .me .hint { margin-left: auto; color: var(--ink-4); font: var(--t-meta); }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
-.demo-band { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 32px; border-bottom: 1px solid var(--line); font: var(--t-meta); color: var(--ink-3); }
-.demo-band b { font-weight: 500; color: var(--ink-2); }
 .page { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 32px 40px; flex: 1; display: flex; flex-direction: column; gap: 22px; animation: page-in 180ms var(--ease); }
 .page > * { min-width: 0; }
 .page-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 32px; }
@@ -467,18 +480,21 @@ table.grid { width: 100%; border-collapse: collapse; font: var(--t-data); }
   .decide-inputs { border-right: 0; border-bottom: 1px solid var(--line); }
 }
 @media (max-width: 760px) {
-  .shell { grid-template-columns: minmax(0, 1fr); }
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .rail {
     z-index: 20; height: auto; flex-direction: row; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none;
     padding: 8px max(12px, env(safe-area-inset-left, 0px)); border-right: 0; border-bottom: 1px solid var(--line);
   }
   .rail::-webkit-scrollbar { display: none; }
-  .ws, .rail-group, .team-link, .rail-foot { display: none; }
+  .ws, .rail-group, .team-link, .rail-foot .me { display: none; }
+  .rail { flex-wrap: wrap; align-content: flex-start; }
+  .rail-foot { display: flex; align-items: center; justify-content: space-between; flex: 1 0 100%; margin: 0; padding: 0; border-top: 0; }
+  .acct { padding: 0; margin-left: auto; }
+  .env-phone { display: block; margin-left: 0; padding-left: 9px; }
   .new-btn { width: 32px; padding: 0; margin: 0 4px 0 0; justify-content: center; flex: none; }
   .new-btn span, .new-btn kbd { display: none; }
   .nav-link { flex: none; gap: 7px; padding: 0 9px; }
   .nav-link svg { display: none; }
-  .demo-band { padding: 0 16px; }
   .page { padding: 20px max(16px, env(safe-area-inset-left, 0px)) 28px; }
   .keys-foot { display: none; }
   .toasts { left: 50%; bottom: 16px; }

@@ -15,6 +15,8 @@ export interface Db {
   /** Runs a multi-statement script (migrations, seed) in one transaction. */
   exec(sql: string): Promise<void>;
   close(): Promise<void>;
+  /** Runs fn while holding a database-wide lock, so two servers starting together cannot both migrate. Optional: PGlite has one user. */
+  withLock?<T>(fn: () => Promise<T>): Promise<T>;
 }
 
 /* Normalise driver output: Date -> ISO string, numeric strings -> numbers. */
@@ -56,6 +58,11 @@ export async function postgresJs(url: string, opts: { max?: number } = {}): Prom
     tx: (fn) => sql.begin(async (t) => fn(async <T>(text: string, params: unknown[] = []) => clean<T>(await t.unsafe<Row[]>(text, params as never[])))) as Promise<never>,
     exec: async (script) => { await sql.begin(async (t) => { await t.unsafe(script); }); },
     close: () => sql.end({ timeout: 5 }),
+    // A transaction-level lock: held by one open transaction (safe behind transaction-mode poolers), released at commit.
+    withLock: <T>(fn: () => Promise<T>) => sql.begin(async (t) => {
+      await t.unsafe("SELECT pg_advisory_xact_lock(727274)");
+      return fn();
+    }) as Promise<T>,
   };
 }
 
@@ -63,6 +70,10 @@ export async function postgresJs(url: string, opts: { max?: number } = {}): Prom
 
 /** Applies each migration once, in order, recording it in schema_migrations. */
 export async function migrate(db: Db, files: { name: string; sql: string }[]) {
+  return db.withLock ? db.withLock(() => applyMigrations(db, files)) : applyMigrations(db, files);
+}
+
+async function applyMigrations(db: Db, files: { name: string; sql: string }[]) {
   await db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
   const done = new Set((await db.query<{ name: string }>("SELECT name FROM schema_migrations")).map((r) => r.name));
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
