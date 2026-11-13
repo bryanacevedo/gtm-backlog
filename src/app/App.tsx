@@ -3,7 +3,8 @@ import { OPEN, teamsOf } from "../shared/domain";
 import { MoveDialog, NewRequest, type PendingMove } from "./forms";
 import { isTyping, linkClick, navigate, parseRoute, useLocation } from "./lib";
 import { actorPrompt, load, setActor, useStore } from "./store";
-import { Avatar, Dialog, Icon, Keys, Team, Toasts } from "./ui";
+import { SettingsDialog, TeamMarkButton } from "./settings";
+import { Avatar, Dialog, Icon, Keys, Toasts } from "./ui";
 import { Board } from "./views/Board";
 import { ItemPage } from "./views/ItemPage";
 import { Queue } from "./views/Queue";
@@ -36,6 +37,7 @@ export function App() {
   const [keysOpen, setKeysOpen] = useState(false);
   const [pending, setPending] = useState<PendingMove | null>(null);
   const [nameEditing, setNameEditing] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -52,7 +54,7 @@ export function App() {
 
   const openNew = useCallback(() => setNewOpen(true), []);
   const shared: Shared = useMemo(() => ({ openNew, requestMove: setPending }), [openNew]);
-  const overlay = newOpen || keysOpen || !!pending || actorPrompt.open || nameEditing;
+  const overlay = newOpen || keysOpen || settingsOpen || !!pending || actorPrompt.open || nameEditing;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -96,12 +98,14 @@ export function App() {
           const active = route.view === "queue" && activeTeam === t;
           const to = active ? "/" : `/?team=${encodeURIComponent(t)}`; // the selected team is the filter; picking it again clears it
           return (
-            <a key={t} href={to} className="team-link" aria-current={active ? "true" : undefined} onClick={linkClick(to)}>
-              <Team name={t} /><span className="count">{n}</span>
-            </a>
+            <div key={t} className="team-line">
+              <TeamMarkButton team={t} />
+              <a href={to} className="team-link" aria-current={active ? "true" : undefined} onClick={linkClick(to)}>{t}<span className="count">{n}</span></a>
+            </div>
           );
         })}
         <div className="rail-foot">
+          <button className="settings-row" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings"><Icon.sliders /><span>Settings</span></button>
           {meta?.demo && <span className="env env-phone">Demo</span>}
           {meta?.space === "real" && meta.user ? (
             <div className="me fixed"><Avatar name={meta.user.name} size="sm" src={meta.user.picture} /><span>{meta.user.name}</span></div>
@@ -146,6 +150,7 @@ export function App() {
       </div>
 
       {newOpen && <NewRequest onClose={() => setNewOpen(false)} onCreated={() => { setNewOpen(false); navigate("/triage"); }} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {pending && <MoveDialog pending={pending} onClose={() => setPending(null)} />}
       {(actorPrompt.open || nameEditing) && <NameDialog initial={actor ?? ""} onDone={(n) => { setNameEditing(false); setActor(n); }} />}
       {keysOpen && (

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { OPEN, isScoreStale, rank, score, teamsOf, type Item } from "../../shared/domain";
+import { OPEN, SCORE_HELP, isScoreStale, rank, score, teamsOf, type Item } from "../../shared/domain";
 import type { Shared } from "../App";
 import { agoShort, daysSince, fmtNum, fmtScore, linkClick, navigate, useQueryParam } from "../lib";
 import { useRowFocus } from "../rows";
 import { useStore } from "../store";
-import { Avatar, Empty, StageLabel, Team } from "../ui";
+import { Avatar, Empty, StageLabel, Team, Tip } from "../ui";
 
 export function Queue({ shared }: { shared: Shared }) {
   const data = useStore((s) => s.data)!;
@@ -48,11 +48,11 @@ export function Queue({ shared }: { shared: Shared }) {
                 <th scope="col" className="pin pin-2 title">Request</th>
                 <th scope="col">Team</th>
                 <th scope="col" className="stage-col">Stage</th>
-                <th scope="col" className="num col-inputs" title="1 a convenience, 5 moves bookings this quarter">Impact</th>
-                <th scope="col" className="num col-inputs" title="Accounts affected per week">Reach</th>
-                <th scope="col" className="num col-inputs" title="How sure the impact is">Confidence</th>
-                <th scope="col" className="num col-inputs" title="Engineering days">Effort</th>
-                <th scope="col" className="num">Score</th>
+                <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.impact}>Impact</Tip></th>
+                <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.reach}>Reach</Tip></th>
+                <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.confidence}>Confidence</Tip></th>
+                <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.effort}>Effort</Tip></th>
+                <th scope="col" className="num"><Tip lines={SCORE_HELP.score}>Score</Tip></th>
                 <th scope="col" className="who">Owner</th>
                 <th scope="col" className="num" title="Days in the current stage">Age</th>
               </tr>

@@ -2,11 +2,11 @@
    preview of where the request lands in the queue before anyone accepts it. */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CONFIDENCE, IMPACT_RUBRIC, OPEN, rank, score, type Item } from "../../shared/domain";
+import { CONFIDENCE, IMPACT_RUBRIC, OPEN, SCORE_HELP, rank, score, type Item, type ScoreWord } from "../../shared/domain";
 import type { Shared } from "../App";
 import { ago, agoShort, fmtScore, isTyping, linkClick } from "../lib";
 import { moveItem, patchItem, toast, useStore } from "../store";
-import { Avatar, Icon, Team } from "../ui";
+import { Avatar, Icon, Team, Tip } from "../ui";
 
 type Draft = { impact: number; reach: number; confidence: number; effort_days: number };
 const DEFAULTS: Draft = { impact: 3, reach: 25, confidence: 80, effort_days: 3 };
@@ -146,10 +146,10 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
         ) : (
           <div className="decide">
             <div className="decide-inputs">
-              <Steps label="Impact" n={5} value={draft.impact} onChange={(v) => setDraft({ ...draft, impact: v })} show={impactShow(draft.impact)} titleFor={(n) => IMPACT_RUBRIC[n]} />
-              <Slider label="Reach" hint="Accounts per week" min={0} max={500} step={5} value={draft.reach} onChange={(v) => setDraft({ ...draft, reach: v })} show={`${draft.reach}/wk`} />
-              <Steps label="Confidence" n={3} value={CONFIDENCE.indexOf(draft.confidence as 50 | 80 | 100) + 1} onChange={(v) => setDraft({ ...draft, confidence: CONFIDENCE[v - 1] })} show={`${draft.confidence}%`} titleFor={(n) => `${CONFIDENCE[n - 1]}%`} />
-              <Slider label="Effort" hint="Engineering days" min={0.5} max={30} step={0.5} value={draft.effort_days} onChange={(v) => setDraft({ ...draft, effort_days: v })} show={`${draft.effort_days} ${draft.effort_days === 1 ? "day" : "days"}`} />
+              <Steps label="Impact" word="impact" n={5} value={draft.impact} onChange={(v) => setDraft({ ...draft, impact: v })} show={impactShow(draft.impact)} titleFor={(n) => IMPACT_RUBRIC[n]} />
+              <Slider label="Reach" word="reach" min={0} max={500} step={5} value={draft.reach} onChange={(v) => setDraft({ ...draft, reach: v })} show={`${draft.reach}/wk`} />
+              <Steps label="Confidence" word="confidence" n={3} value={CONFIDENCE.indexOf(draft.confidence as 50 | 80 | 100) + 1} onChange={(v) => setDraft({ ...draft, confidence: CONFIDENCE[v - 1] })} show={`${draft.confidence}%`} titleFor={(n) => `${CONFIDENCE[n - 1]}%`} />
+              <Slider label="Effort" word="effort" min={0.5} max={30} step={0.5} value={draft.effort_days} onChange={(v) => setDraft({ ...draft, effort_days: v })} show={`${draft.effort_days} ${draft.effort_days === 1 ? "day" : "days"}`} />
             </div>
             <div className="decide-rank" aria-live="polite">
               <span className="hint">Lands in the queue at</span>
@@ -209,11 +209,11 @@ function Tick({ value }: { value: string }) {
 /** The impact number and its rubric word, so the scale reads as a reading, not a bare 3. */
 export const impactShow = (n: number) => <>{n}<span className="rub"> · {IMPACT_RUBRIC[n]}</span></>;
 
-export function Steps({ label, n, value, onChange, show, titleFor }: { label: string; n: number; value: number; onChange: (v: number) => void; show: ReactNode; titleFor: (n: number) => string }) {
+export function Steps({ label, word, n, value, onChange, show, titleFor }: { label: string; word: ScoreWord; n: number; value: number; onChange: (v: number) => void; show: ReactNode; titleFor: (n: number) => string }) {
   const id = `st-${label.toLowerCase()}`;
   return (
     <div className="in-row">
-      <span className="lab" id={id}>{label}</span>
+      <span className="lab" id={id}><Tip lines={SCORE_HELP[word]}>{label}</Tip></span>
       <span className="steps" role="group" aria-labelledby={id}>
         {Array.from({ length: n }, (_, i) => i + 1).map((v) => (
           <button key={v} type="button" className={v <= value ? "f" : undefined} aria-pressed={v === value} aria-label={`${label} ${titleFor(v)}`} title={titleFor(v)} onClick={() => onChange(v)}><i /></button>
@@ -224,13 +224,13 @@ export function Steps({ label, n, value, onChange, show, titleFor }: { label: st
   );
 }
 
-export function Slider({ label, hint, min, max, step, value, onChange, show }: { label: string; hint?: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void; show: ReactNode }) {
+export function Slider({ label, word, min, max, step, value, onChange, show }: { label: string; word: ScoreWord; min: number; max: number; step: number; value: number; onChange: (v: number) => void; show: ReactNode }) {
   const id = `sl-${label.toLowerCase()}`;
   const pct = ((value - min) / (max - min)) * 100;
   return (
     <div className="in-row">
-      <label className="lab" htmlFor={id} title={hint}>{label}</label>
-      <input id={id} className="range" type="range" min={min} max={max} step={step} value={value} style={{ ["--p" as string]: `${pct}%` }} onChange={(e) => onChange(Number(e.target.value))} />
+      <span className="lab" id={`${id}-l`}><Tip lines={SCORE_HELP[word]}>{label}</Tip></span>
+      <input id={id} aria-labelledby={`${id}-l`} className="range" type="range" min={min} max={max} step={step} value={value} style={{ ["--p" as string]: `${pct}%` }} onChange={(e) => onChange(Number(e.target.value))} />
       <span className="val">{show}</span>
     </div>
   );

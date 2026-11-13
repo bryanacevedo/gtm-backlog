@@ -4,12 +4,15 @@
 
 import { useSyncExternalStore } from "react";
 import type { EventRow, Item, ShipLogEntry, Stage } from "../shared/domain";
+import { DEFAULT_ACCENT, accentHover, type Settings } from "../shared/settings";
+import type { WorkLink } from "../shared/work";
 
 export interface Snapshot {
   items: Item[];
   shipLog: ShipLogEntry[];
   events: EventRow[];
-  meta: { demo: boolean; writeKey: boolean; now: string; space?: "demo" | "real"; user?: { name: string; email: string; picture?: string } | null; signIn?: boolean };
+  workLinks: WorkLink[];
+  meta: { demo: boolean; writeKey: boolean; now: string; settings: Settings; space?: "demo" | "real"; user?: { name: string; email: string; picture?: string } | null; signIn?: boolean };
 }
 
 export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void }
@@ -80,9 +83,39 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return json;
 }
 
+/* ----------------------------------------------------------------- accent */
+
+/** The accent is one CSS token (--accent) and the text on it (--accent-ink). The default is the stylesheet's own ink, so it needs no override.
+    The last accent is kept in this browser so the first paint is already the right colour; the server's answer replaces it. */
+const ACCENT_CACHE = "gtm-backlog.accent";
+export function applyAccent(hex: string) {
+  const root = document.documentElement.style;
+  if (hex.toUpperCase() === DEFAULT_ACCENT) { root.removeProperty("--accent"); root.removeProperty("--accent-hover"); root.removeProperty("--accent-ink"); }
+  else { root.setProperty("--accent", hex); root.setProperty("--accent-hover", accentHover(hex)); root.setProperty("--accent-ink", "#FFFFFF"); }
+  try { localStorage.setItem(ACCENT_CACHE, hex); } catch { /* storage blocked: the next load starts from the stylesheet's colour */ }
+}
+try { const c = localStorage.getItem(ACCENT_CACHE); if (c && /^#[0-9A-F]{6}$/i.test(c)) applyAccent(c); } catch { /* ignore */ }
+
+/** Saves a setting. The screen changes at once; a refusal puts it back and says why. */
+export async function saveSetting<K extends keyof Settings>(key: K, value: Settings[K]): Promise<string | null> {
+  const before = state.data?.meta.settings;
+  if (!state.data || !before) return "The backlog has not loaded yet.";
+  const put = (settings: Settings) => { set({ data: { ...state.data!, meta: { ...state.data!.meta, settings } } }); applyAccent(settings.accent); };
+  put({ ...before, [key]: value });
+  try {
+    const res = await call<{ settings: Settings }>("PUT", `/api/settings/${key}`, { value });
+    put(res.settings); refreshEvents();
+    return null;
+  } catch (e) {
+    put(before);
+    return (e as Error).message;
+  }
+}
+
 export async function load() {
   try {
     const data = await call<Snapshot>("GET", "/api/state");
+    applyAccent(data.meta.settings.accent);
     // In the real space the server logs changes under the signed-in name, so the browser never asks for one.
     set({ data, loadError: null, ...(data.meta.space === "real" && data.meta.user ? { actor: data.meta.user.name } : {}) });
   } catch (e) {
@@ -158,6 +191,33 @@ export async function logResult(id: string, input: Record<string, unknown>): Pro
     toast("Result logged."); refreshEvents();
     return true;
   } catch (e) {
+    toast((e as Error).message, "error");
+    return false;
+  }
+}
+
+/* -------------------------------------------------------------- work links */
+
+export async function addLink(itemId: string, input: { url: string; title?: string }): Promise<string | null> {
+  try {
+    const { link } = await call<{ link: WorkLink }>("POST", `/api/items/${itemId}/links`, input);
+    if (state.data) set({ data: { ...state.data, workLinks: [link, ...state.data.workLinks] } });
+    refreshEvents();
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
+export async function removeLink(itemId: string, link: WorkLink): Promise<boolean> {
+  const before = state.data?.workLinks ?? [];
+  if (state.data) set({ data: { ...state.data, workLinks: before.filter((l) => l.id !== link.id) } });
+  try {
+    await call("DELETE", `/api/items/${itemId}/links/${link.id}`);
+    refreshEvents();
+    return true;
+  } catch (e) {
+    if (state.data) set({ data: { ...state.data, workLinks: before } });
     toast((e as Error).message, "error");
     return false;
   }

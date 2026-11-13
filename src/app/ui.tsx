@@ -1,8 +1,10 @@
 /* The closed component vocabulary. Anything a view needs that is not here
    should be added here once, not invented per page. */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { label, type Stage } from "../shared/domain";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { label, teamsOf, type Stage } from "../shared/domain";
+import { fallbackColor, resolveTeamColors, type TeamColorState } from "../shared/settings";
 import { dismiss, useStore } from "./store";
 
 /* ------------------------------------------------------------------ stages */
@@ -33,20 +35,19 @@ export function StageSelect({ stage, silent = false, moves, onMove }: { stage: S
 
 /* ------------------------------------------------------------- people, teams */
 
-/* Team colors are identity, not state: a 7px mark beside the team name tells teams apart at a glance (Bryan kept it,
-   2026-11-12). design-lint: allow team identity colour, approved by Bryan */
-export const TEAM_COLOR: Record<string, string> = {
-  Sales: "#2563EB", SDR: "#0E7490", Marketing: "#DB2777", "Field Marketing": "#D97706",
-  "Demand Gen": "#EA580C", RevOps: "#0D9488", Partnerships: "#65A30D", "Customer Success": "#B45309",
-  "Ways of working": "#7C3AED",
-};
-/* A team nobody listed above still gets an identity colour, stable per name and never grey or warm (same idea as personColor). */
-const TEAM_FALLBACK = ["#7C3AED", "#4F46E5", "#0284C7", "#16A34A", "#C026D3", "#0891B2", "#9333EA", "#059669"];
-export function teamColor(name: string) {
-  if (TEAM_COLOR[name]) return TEAM_COLOR[name];
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return TEAM_FALLBACK[h % TEAM_FALLBACK.length];
+/* Team colours are identity, not state: a 7px mark beside the team name tells teams apart at a glance (Bryan kept it,
+   2026-11-12). Each comes from a validated palette in the settings (shared/settings.ts), never a free hex, and no two teams share one. */
+let colorCache: { stored: unknown; teams: string; out: TeamColorState } | null = null;
+export function useTeamColors(): TeamColorState {
+  const stored = useStore((s) => s.data?.meta.settings.team_colors);
+  const items = useStore((s) => s.data?.items);
+  const teams = teamsOf(items ?? []);
+  const key = teams.join("|");
+  if (!colorCache || colorCache.stored !== stored || colorCache.teams !== key) colorCache = { stored, teams: key, out: resolveTeamColors(stored, teams) };
+  return colorCache.out;
+}
+export function useTeamColor(name: string) {
+  return useTeamColors().color[name] ?? fallbackColor(name);
 }
 const PERSON_COLORS = ["#C2410C", "#1D4ED8", "#BE185D", "#0F766E", "#3F3F46", "#B45309", "#15803D", "#9F1239", "#0369A1", "#4D7C0F"];
 
@@ -89,9 +90,15 @@ export function Avatar({ name, size, src }: { name: string | null; size?: "sm" |
   );
 }
 
-export function Team({ name }: { name: string }) {
+/** The team's colour mark. It identifies, it never signals a state. */
+export function TeamMark({ name }: { name: string }) {
+  const color = useTeamColor(name);
   // design-lint: allow team identity colour, approved by Bryan
-  return <><span className="tdot" style={{ background: teamColor(name) }} aria-hidden="true" />{name}</>;
+  return <span className="tdot" style={{ background: color }} aria-hidden="true" />;
+}
+
+export function Team({ name }: { name: string }) {
+  return <><TeamMark name={name} />{name}</>;
 }
 
 /* ------------------------------------------------------------------- icons */
@@ -105,12 +112,13 @@ export const Icon = {
   plus: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>,
   back: () => <svg viewBox="0 0 16 16" {...P} strokeWidth={1.6} aria-hidden="true"><path d="m10 3.5-4.5 4.5 4.5 4.5" /></svg>,
   close: () => <svg viewBox="0 0 16 16" {...P} strokeWidth={1.6} aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>,
+  sliders: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><path d="M2.5 5h5.2M11.3 5h2.2M2.5 11h2.2M8.3 11h5.2" /><circle cx="9.5" cy="5" r="1.8" /><circle cx="6.5" cy="11" r="1.8" /></svg>,
   external: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><path d="M6.5 3.5h-3v9h9v-3M9.5 2.5h4v4M13.5 2.5 7.5 8.5" /></svg>,
 };
 
 /* ----------------------------------------------------------------- dialog */
 
-export function Dialog({ title, onClose, children, labelledBy, closeButton, focusId }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string; closeButton?: boolean; focusId?: string }) {
+export function Dialog({ title, onClose, children, labelledBy, closeButton, focusId, sheet }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string; closeButton?: boolean; focusId?: string; sheet?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const hid = useId();
   useEffect(() => {
@@ -131,8 +139,8 @@ export function Dialog({ title, onClose, children, labelledBy, closeButton, focu
     return () => { document.removeEventListener("keydown", onKey, true); document.body.style.overflow = ""; prev?.focus?.(); };
   }, [onClose]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={labelledBy ?? hid} ref={ref}>
+    <div className={`scrim${sheet ? " sheet" : ""}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`dialog${sheet ? " sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy ?? hid} ref={ref}>
         <div className="dialog-head">
           <h2 id={hid}>{title}</h2>
           {closeButton && <button className="btn icon" type="button" aria-label="Close" onClick={onClose}><Icon.close /></button>}
@@ -157,6 +165,56 @@ export function Toasts() {
         </div>
       ))}
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------- tooltip */
+
+/** One tooltip for the whole app. Opens on hover and on keyboard focus; a tap opens it on a phone and a tap elsewhere closes it;
+    Escape closes it. The text is always in the page and tied to the label with aria-describedby, so a screen reader reads it with the label. */
+export function Tip({ lines, children }: { lines: readonly string[]; children: ReactNode }) {
+  const id = useId();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [hover, setHover] = useState(false), [focus, setFocus] = useState(false), [pin, setPin] = useState(false), [gone, setGone] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number }>({ left: 0, top: 0 });
+  const touch = useRef(false);
+  const open = !gone && (hover || focus || pin);
+
+  const place = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    const w = Math.min(264, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8));
+    // Below the label, unless it would run off the bottom of the screen.
+    setPos(r.bottom + 8 + 150 > window.innerHeight && r.top > 160 ? { left, bottom: window.innerHeight - r.top + 8 } : { left, top: r.bottom + 8 });
+  };
+  useLayoutEffect(() => { if (open) place(); }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) { setHover(false); setPin(false); setGone(true); } };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setGone(true); } };
+    document.addEventListener("pointerdown", away); document.addEventListener("keydown", key, true);
+    window.addEventListener("scroll", place, true); window.addEventListener("resize", place);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", key, true); window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); };
+  }, [open]);
+
+  return (
+    <>
+      <button ref={ref} type="button" className="tip" aria-describedby={id}
+        onPointerDown={(e) => { touch.current = e.pointerType === "touch"; }}
+        onClick={() => { if (touch.current) { setGone(false); setPin((p) => !p); } }}
+        onMouseEnter={() => { setGone(false); setHover(true); }} onMouseLeave={() => { setHover(false); setGone(false); }}
+        onFocus={() => { setGone(false); setFocus(true); }} onBlur={() => { setFocus(false); setPin(false); setGone(false); }}>
+        {children}
+      </button>
+      {createPortal(
+        <span id={id} role="tooltip" className={`tip-bubble${open ? " on" : ""}`} style={pos}>
+          {lines.map((l, i) => {
+            const row = i > 0 ? l.match(/^(\S+)\s{2}(.*)$/) : null;
+            return row ? <span key={i} className="tip-row"><b>{row[1]}</b>{row[2]}</span> : <span key={i} className={i === 0 ? "tip-head" : undefined}>{l}</span>;
+          })}
+        </span>, document.body)}
+    </>
   );
 }
 
