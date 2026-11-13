@@ -4,9 +4,9 @@
 
 **The backlog for a GTM engineering team.** Requests land in one inbox, get ranked by what they're worth to revenue, move from idea to live, and keep reporting what they did after they ship.
 
-**Live demo:** https://gtm-backlog.leandrive.workers.dev (sample data, editable, resets nightly)
+**Live demo:** https://gtm-backlog.onrender.com (sample data, editable, resets nightly; the free plan sleeps when idle, so the first visit can take a minute)
 
-[![Watch the 66-second walkthrough](docs/screens/video-poster.jpg)](https://gtm-backlog.leandrive.workers.dev/video/gtm-backlog.mp4)
+[![Watch the 66-second walkthrough](docs/screens/video-poster.jpg)](https://gtm-backlog.onrender.com/video/gtm-backlog.mp4)
 
 ![Triage: requests on the left, the decision on the right, and a live preview of where the request lands in the queue](docs/screens/triage.png)
 
@@ -47,6 +47,8 @@ DATABASE_URL=postgresql://… WRITE_KEY=choose-a-secret npm start
 
 Migrations apply on start. Your database starts empty; add `SEED_SAMPLE=1` only if you want the sample backlog in it. With `WRITE_KEY` set, changes need that key, so leave it unset only on a private network.
 
+**Deploy to Render:** `render.yaml` runs the demo on the free plan (`node src/server/node.ts --demo`, health check `/api/health`). The Node server reloads the sample backlog every night at 06:00 UTC and again on start, so a sleeping service wakes up fresh.
+
 **Deploy to Cloudflare Workers:** run `DATABASE_URL=… npm run migrate` once, then `npx wrangler secret put DATABASE_URL` and `npm run deploy`. The Worker does not run migrations itself.
 
 **Checks:** `make test` runs the unit tests, the database tests (real Postgres via PGlite) and the typecheck. `node scripts/audit-layout.mjs` checks alignment in a real browser against the running demo (`make demo` first; set `CHROME` to your Chrome binary outside macOS).
@@ -76,7 +78,7 @@ flowchart LR
 | API | Hono, one transaction per write, every write logged as an event | The activity feed doubles as the audit trail. Moves lock the row, so two people can't both win a race. |
 | Database | Postgres 15+ | Stage enum; `CHECK` constraints for "live needs a system link", "declined or retired needs a reason", no self-merge and every input range. The rules hold even if someone skips the API. A generated `score` column and a ranked `queue` view mirror the app's math for reporting, and a test proves they match. |
 | Local | PGlite (Postgres compiled to WebAssembly) | `make demo` works on any machine with Node and nothing else. |
-| Hosted | Cloudflare Workers + Supabase Postgres | The same Hono app as local. A nightly cron reloads the demo. |
+| Hosted | Render (Node, PGlite) or Cloudflare Workers + Supabase Postgres | The same Hono app as local. The live demo runs on Render; a nightly timer (a cron on Workers) reloads it. |
 | UI | React + Vite, no component library | Small, fast, and every component built for this product. |
 
 More detail: [docs/SPEC.md](docs/SPEC.md) for the product, and [docs/DECISIONS.md](docs/DECISIONS.md) for the trade-offs.
