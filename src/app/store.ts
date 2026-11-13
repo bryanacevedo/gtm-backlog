@@ -12,7 +12,7 @@ export interface Snapshot {
   shipLog: ShipLogEntry[];
   events: EventRow[];
   workLinks: WorkLink[];
-  meta: { demo: boolean; writeKey: boolean; now: string; settings: Settings; space?: "demo" | "real"; user?: { name: string; email: string; picture?: string } | null; signIn?: boolean };
+  meta: { demo: boolean; writeKey: boolean; now: string; settings: Settings; photos?: Record<string, string>; space?: "demo" | "real"; user?: { name: string; email: string; picture?: string } | null; signIn?: boolean };
 }
 
 export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void }
@@ -108,6 +108,18 @@ export async function saveSetting<K extends keyof Settings>(key: K, value: Setti
     return null;
   } catch (e) {
     put(before);
+    return (e as Error).message;
+  }
+}
+
+/** Saves, or with null removes, the signed-in person's own photo. Returns a message when it was refused. */
+export async function savePhoto(photo: string | null): Promise<string | null> {
+  try {
+    const res = await call<{ photos: Record<string, string> }>(photo ? "PUT" : "DELETE", "/api/me/photo", photo ? { photo } : undefined);
+    if (state.data) set({ data: { ...state.data, meta: { ...state.data.meta, photos: res.photos } } });
+    refreshEvents();
+    return null;
+  } catch (e) {
     return (e as Error).message;
   }
 }

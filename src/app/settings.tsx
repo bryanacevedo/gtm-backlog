@@ -4,8 +4,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { teamsOf } from "../shared/domain";
 import { ACCENT_SWATCHES, TEAM_PALETTE, accentError, normalizeHex } from "../shared/settings";
-import { saveSetting, toast, useStore } from "./store";
-import { Dialog, TeamMark, useTeamColors } from "./ui";
+import { squareJpeg } from "./photo";
+import { savePhoto, saveSetting, toast, useStore } from "./store";
+import { Avatar, Dialog, TeamMark, useTeamColors } from "./ui";
 
 /* ------------------------------------------------------------ team colours */
 
@@ -113,6 +114,40 @@ function AccentPicker() {
   );
 }
 
+/* ------------------------------------------------------------------- photo */
+
+/** The signed-in person's own photo. Offered only in the real space: the demo has no addresses to keep a photo under. */
+function YourPhoto() {
+  const me = useStore((s) => s.data!.meta.user);
+  const mine = useStore((s) => (me ? s.data!.meta.photos?.[me.name] : undefined));
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  if (!me) return null;
+
+  const choose = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true); setErr(null);
+    try { setErr(await savePhoto(await squareJpeg(file))); } catch (e) { setErr((e as Error).message); }
+    setBusy(false);
+    if (input.current) input.current.value = "";
+  };
+  const remove = async () => { setBusy(true); setErr(await savePhoto(null)); setBusy(false); };
+
+  return (
+    <section className="set-block" aria-labelledby="set-photo">
+      <h3 id="set-photo">Your photo</h3>
+      <div className="photo-row">
+        <Avatar name={me.name} size="lg" />
+        <button type="button" className="btn quiet" disabled={busy} onClick={() => input.current?.click()}>{mine ? "Change photo" : "Choose photo"}</button>
+        {mine && <button type="button" className="btn quiet" disabled={busy} onClick={remove}>Remove</button>}
+        <input ref={input} className="sr-only" type="file" accept="image/*" tabIndex={-1} aria-label="Photo file" onChange={(e) => void choose(e.target.files?.[0])} />
+      </div>
+      <span className="error-text" role={err ? "alert" : undefined}>{err}</span>
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------------- sheet */
 
 function TeamColours() {
@@ -137,9 +172,11 @@ function TeamColours() {
 }
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
+  const real = useStore((s) => s.data!.meta.space === "real" && !!s.data!.meta.user);
   return (
     <Dialog title="Settings" onClose={onClose} closeButton sheet>
       <div className="settings">
+        {real && <YourPhoto />}
         <AccentPicker />
         <TeamColours />
       </div>

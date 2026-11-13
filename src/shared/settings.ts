@@ -127,6 +127,32 @@ export function checkTeamColors(v: unknown): { value: Record<string, string> } |
   return { value: out };
 }
 
+/* ------------------------------------------------------------------ photos */
+
+/** A person's own photo: the app makes a 160px JPEG well under this; the server holds every upload to it. */
+export const PHOTO_MAX_BYTES = 40 * 1024;
+export const PHOTO_SIZE = 160;
+const PHOTO_URL = /^data:image\/(jpeg|png);base64,([A-Za-z0-9+/]+={0,2})$/;
+const MAGIC = { jpeg: [0xff, 0xd8, 0xff], png: [0x89, 0x50, 0x4e, 0x47] } as const;
+
+/** Validates an uploaded photo: a base64 data URL of a JPEG or PNG, no larger than 40 KB, whose bytes really are that format. */
+export function checkPhoto(v: unknown): { value: string } | { error: string } {
+  if (typeof v !== "string" || v.length > Math.ceil(PHOTO_MAX_BYTES / 3) * 4 + 40) return { error: "That photo is too large. It must be under 40 KB." };
+  const m = PHOTO_URL.exec(v);
+  if (!m) return { error: "Use a JPEG or PNG image." };
+  let bytes: Uint8Array;
+  try { bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0)); } catch { return { error: "That photo could not be read." }; }
+  if (bytes.length > PHOTO_MAX_BYTES) return { error: "That photo is too large. It must be under 40 KB." };
+  if (!MAGIC[m[1] as "jpeg" | "png"].every((b, i) => bytes[i] === b)) return { error: "That file is not the image type it says it is." };
+  return { value: v };
+}
+
+/** Which photo an avatar shows: the person's uploaded photo, then an explicit one (their Google picture in the rail), the sample team's, their Google picture matched by name. Initials when none. */
+export function pickPhoto(name: string, o: { uploaded?: Record<string, string> | null; src?: string | null; sample?: Record<string, string>; me?: { name: string; picture?: string | null } | null }): string | undefined {
+  const own = (m: Record<string, string> | null | undefined) => (m && Object.hasOwn(m, name) ? m[name] : undefined);
+  return own(o.uploaded) ?? o.src ?? own(o.sample) ?? (o.me?.picture && o.me.name === name ? o.me.picture : undefined) ?? undefined;
+}
+
 /* ----------------------------------------------------------------- the API */
 
 export const SETTING_KEYS = ["accent", "team_colors"] as const;

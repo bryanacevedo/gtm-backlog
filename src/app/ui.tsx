@@ -4,7 +4,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { label, teamsOf, type Stage } from "../shared/domain";
-import { fallbackColor, resolveTeamColors, type TeamColorState } from "../shared/settings";
+import { fallbackColor, pickPhoto, resolveTeamColors, type TeamColorState } from "../shared/settings";
 import { dismiss, useStore } from "./store";
 
 /* ------------------------------------------------------------------ stages */
@@ -73,14 +73,15 @@ export function personColor(name: string) {
   return PERSON_COLORS[h % PERSON_COLORS.length];
 }
 
-/** Precedence: an explicit src, the sample team's photo, the signed-in user's Google photo (matched by name), then initials.
+/** Precedence: the person's uploaded photo (matched by name), an explicit src, the sample team's photo, the signed-in user's Google photo (matched by name), then initials.
     A photo that fails to load falls back to initials. No name, no avatar: an empty owner is an empty cell, not a shape. */
 export function Avatar({ name, size, src }: { name: string | null; size?: "sm" | "lg"; src?: string | null }) {
   const me = useStore((s) => s.data?.meta.user ?? null);
+  const uploaded = useStore((s) => s.data?.meta.photos);
   const [failed, setFailed] = useState<string | null>(null);
   if (!name) return null;
   const cls = `av${size ? " " + size : ""}`;
-  const photo = src ?? PHOTOS[name] ?? (me?.picture && me.name === name ? me.picture : undefined);
+  const photo = pickPhoto(name, { uploaded, src, sample: PHOTOS, me });
   const shown = photo && photo !== failed ? photo : null;
   const initials = name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   return (

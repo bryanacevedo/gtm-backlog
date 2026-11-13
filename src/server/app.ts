@@ -11,7 +11,7 @@ import {
   TEAMS, TOUCHES, canLogResults, label, moveError, validateInputs,
   type EventRow, type Item, type ShipLogEntry, type Stage,
 } from "../shared/domain.ts";
-import { DEFAULT_ACCENT, accentError, checkSetting, normalizeHex, type Settings } from "../shared/settings.ts";
+import { DEFAULT_ACCENT, accentError, checkPhoto, checkSetting, normalizeHex, type Settings } from "../shared/settings.ts";
 import { kindWord, parseWorkLink, readPullRequest, type WorkLink } from "../shared/work.ts";
 
 /** Which data space a request reaches, decided by the caller's credentials and nothing the request names. */
@@ -20,6 +20,8 @@ export interface Space {
   demo: boolean;
   /** When set, writes are logged under this name and the x-actor header is ignored (a signed-in user). */
   actor?: string;
+  /** The signed-in person's Google address (real space only). A photo is stored under it, so it is never taken from the request. */
+  email?: string;
   /** Put in front of a name the caller supplies (scripts), so it cannot pass for a signed-in person. */
   actorPrefix?: string;
   /** Merged into the meta of /api/state (who is signed in, which space, what the header may offer). */
@@ -74,6 +76,14 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     return { accent: accent && !accentError(accent) ? accent : defaultAccent, team_colors: (stored.team_colors && typeof stored.team_colors === "object" ? stored.team_colors : {}) as Record<string, string> };
   };
 
+  /** Uploaded photos by person's name. The addresses they are stored under never leave the server. */
+  const readPhotos = async (db: Db): Promise<Record<string, string>> => {
+    const [row] = await db.query<{ val: Record<string, { name?: unknown; photo?: unknown }> | null }>("SELECT value AS val FROM settings WHERE key = 'user_photos'");
+    const out: Record<string, string> = {};
+    if (row?.val && typeof row.val === "object") for (const v of Object.values(row.val)) if (v && typeof v.name === "string" && typeof v.photo === "string" && "value" in checkPhoto(v.photo)) out[v.name] = v.photo;
+    return out;
+  };
+
   /* ---------------------------------------------------------- write gate */
 
   app.use("/api/*", async (c, next) => {
@@ -103,14 +113,15 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
 
   app.get("/api/state", async (c) => {
     const db = dbOf(c);
-    const [items, shipLog, events, workLinks, settings] = await Promise.all([
+    const [items, shipLog, events, workLinks, settings, photos] = await Promise.all([
       db.query<Item>(`SELECT ${ITEM_COLS} FROM items`),
       db.query<ShipLogEntry>(`SELECT ${LOG_COLS} FROM ship_log ORDER BY date DESC, created_at DESC`),
       db.query<EventRow>("SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400"),
       db.query<WorkLink>(`SELECT ${WORK_COLS} FROM work_links ORDER BY created_at DESC`),
       readSettings(db),
+      readPhotos(db),
     ]);
-    return c.json({ items, shipLog, events, workLinks, meta: { demo: c.get("space").demo, writeKey: !cfg.resolve && Boolean(cfg.writeKey), now: new Date().toISOString(), settings, ...c.get("space").meta } });
+    return c.json({ items, shipLog, events, workLinks, meta: { demo: c.get("space").demo, writeKey: !cfg.resolve && Boolean(cfg.writeKey), now: new Date().toISOString(), settings, photos, ...c.get("space").meta } });
   });
 
   app.get("/api/health", async (c) => {
@@ -328,6 +339,37 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       await event(q, null, actor, "settings", key === "accent" ? `Set the accent colour to ${checked.value}` : "Changed the team colours");
     });
     return c.json({ key, value: checked.value, settings: await readSettings(db) });
+  });
+
+  /* A person's own photo. Only the signed-in person's own address can be written, and only in the real space:
+     the demo has no addresses and a script with the write key is nobody. */
+  const photoOwner = (c: Context<Ctx>) => {
+    const { email, demo } = c.get("space");
+    return !demo && email ? email.trim().toLowerCase() : null;
+  };
+  app.put("/api/me/photo", async (c) => {
+    const email = photoOwner(c);
+    if (!email) return bad("A photo belongs to a signed-in person in the real backlog.", 403);
+    const b = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const checked = checkPhoto(b.photo);
+    if ("error" in checked) return bad(checked.error);
+    const actor = c.get("actor"), db = dbOf(c);
+    await db.tx(async (q) => {
+      await q("INSERT INTO settings (key, value, updated_at) VALUES ('user_photos', $1::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value, updated_at = now()",
+        [JSON.stringify({ [email]: { name: actor, photo: checked.value } })]);
+      await event(q, null, actor, "settings", "Changed their photo");
+    });
+    return c.json({ photos: await readPhotos(db) });
+  });
+  app.delete("/api/me/photo", async (c) => {
+    const email = photoOwner(c);
+    if (!email) return bad("A photo belongs to a signed-in person in the real backlog.", 403);
+    const actor = c.get("actor"), db = dbOf(c);
+    await db.tx(async (q) => {
+      await q("UPDATE settings SET value = value - $1::text, updated_at = now() WHERE key = 'user_photos'", [email]);
+      await event(q, null, actor, "settings", "Removed their photo");
+    });
+    return c.json({ photos: await readPhotos(db) });
   });
 
   app.all("/api/*", () => bad("No such endpoint.", 404));
