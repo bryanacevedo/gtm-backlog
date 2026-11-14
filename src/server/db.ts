@@ -56,6 +56,16 @@ export function withLimit<T>(p: Promise<T>, ms: number = QUERY_LIMIT_MS): Promis
   return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }
 
+/** Gives `open` at most `ms` to produce a database. If the time runs out first the caller gets an error, and a database that
+    connects after that is closed, so a slow start never leaves a stray pool open. */
+export function openWithin(open: Promise<Db>, ms: number, message: string): Promise<Db> {
+  let timer: ReturnType<typeof setTimeout>;
+  let lost = false;
+  const late = new Promise<never>((_, rej) => { timer = setTimeout(() => { lost = true; rej(new Error(message)); }, ms); timer.unref?.(); });
+  open.then((d) => { if (lost) d.close().catch(() => {}); }, () => {}); // a failure after the race was lost is already reported through the result
+  return Promise.race([open, late]).finally(() => clearTimeout(timer));
+}
+
 export async function postgresJs(url: string, opts: { max?: number; limitMs?: number } = {}): Promise<Db> {
   const { default: postgres } = await import("postgres");
   // prepare:false keeps it compatible with transaction-mode poolers (Supabase pooler, Hyperdrive).

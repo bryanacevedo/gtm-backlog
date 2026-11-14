@@ -21,7 +21,7 @@ import type { Hono } from "hono";
 import { createApp } from "./app.ts";
 import { authConfigFromEnv } from "./auth.ts";
 import { createHosted } from "./hosted.ts";
-import { migrate, pglite, postgresJs, type Db } from "./db.ts";
+import { migrate, openWithin, pglite, postgresJs, type Db } from "./db.ts";
 import { seedSql } from "./seed.ts";
 import { keepAlive, sampleIsStale, scheduleNightly } from "./nightly.ts";
 
@@ -86,8 +86,7 @@ if (hosted) {
       console.log("Real space ready (migrations applied).");
       return d;
     })();
-    const p = Promise.race([open, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Real database did not answer within 30 seconds.")), 30_000).unref())]);
-    open.catch(() => {}); // a late failure after the race was lost is already reported through p
+    const p = openWithin(open, 30_000, "Real database did not answer within 30 seconds.");
     real = p;
     p.catch((e) => { console.error("Real space failed to open:", e); setTimeout(() => { if (real === p) real = null; }, 15_000).unref(); });
     return p;

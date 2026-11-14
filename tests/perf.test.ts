@@ -1,7 +1,7 @@
 /* Load cost: how many database round trips a page load makes, the settings cache, the Server-Timing header, the query time limit. */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/server/app";
-import { migrate, pglite, withLimit, type Db } from "../src/server/db";
+import { migrate, openWithin, pglite, withLimit, type Db } from "../src/server/db";
 import { allMigrations } from "./migrations";
 
 let db: Db, texts: string[];
@@ -99,6 +99,30 @@ describe("withLimit", () => {
   it("passes an answer through and clears its timer", async () => {
     vi.useFakeTimers();
     await expect(withLimit(Promise.resolve(7), 1000)).resolves.toBe(7);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("openWithin", () => {
+  const fake = () => ({ close: vi.fn(async () => {}) }) as unknown as import("../src/server/db.ts").Db;
+  it("fails after the limit and closes a database that connects late", async () => {
+    vi.useFakeTimers();
+    const db = fake();
+    let connect!: (d: typeof db) => void;
+    const open = new Promise<typeof db>((r) => { connect = r; });
+    const result = openWithin(open, 30_000, "too slow");
+    const seen = expect(result).rejects.toThrow("too slow");
+    await vi.advanceTimersByTimeAsync(30_001);
+    await seen;
+    connect(db);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(db.close).toHaveBeenCalledTimes(1);
+  });
+  it("keeps a database that connects in time open", async () => {
+    vi.useFakeTimers();
+    const db = fake();
+    await expect(openWithin(Promise.resolve(db), 30_000, "too slow")).resolves.toBe(db);
+    expect(db.close).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
 });
