@@ -337,7 +337,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       const [dup] = await q<{ id: string }>("SELECT id FROM work_links WHERE item_id = $1 AND url = $2", [item.id, parsed.url]);
       if (dup) return { error: bad("That link is already on this item.", 409) };
       const id = newId("wl");
-      await q("INSERT INTO work_links (id, item_id, kind, url, title, state, meta, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)",
+      await q("INSERT INTO work_links (id, item_id, kind, url, title, state, meta, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7::text::jsonb, $8)",
         [id, item.id, parsed.kind, parsed.url, title, state, JSON.stringify(meta), actor]);
       await q("UPDATE items SET updated_at = now() WHERE id = $1", [item.id]);
       await event(q, item.id, actor, "edited", `Linked ${kindWord(parsed.kind)}${parsed.kind === "pr" && meta.number ? ` #${meta.number}` : parsed.kind === "repo" || parsed.kind === "commit" ? ` ${title}` : ""}`);
@@ -371,7 +371,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const actor = c.get("actor");
     const db = dbOf(c);
     await db.tx(async (q) => {
-      await q("INSERT INTO settings (key, value, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", [key, JSON.stringify(checked.value)]);
+      await q("INSERT INTO settings (key, value, updated_at) VALUES ($1, $2::text::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", [key, JSON.stringify(checked.value)]);
       await event(q, null, actor, "settings", key === "accent" ? `Set the accent colour to ${checked.value}` : key === "team_glyphs" ? "Changed the team glyphs" : "Changed the team colours");
     });
     dropSettings(db);
@@ -392,7 +392,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     if ("error" in checked) return bad(checked.error);
     const actor = c.get("actor"), db = dbOf(c);
     await db.tx(async (q) => {
-      await q("INSERT INTO settings (key, value, updated_at) VALUES ('user_photos', $1::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = settings.value || EXCLUDED.value, updated_at = now()",
+      await q("INSERT INTO settings (key, value, updated_at) VALUES ('user_photos', $1::text::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = CASE WHEN jsonb_typeof(settings.value) = 'object' THEN settings.value || EXCLUDED.value ELSE EXCLUDED.value END, updated_at = now()",
         [JSON.stringify({ [email]: { name: actor, photo: checked.value } })]);
       await event(q, null, actor, "settings", "Changed their photo");
     });
@@ -404,7 +404,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     if (!email) return bad("A photo belongs to a signed-in person in the real backlog.", 403);
     const actor = c.get("actor"), db = dbOf(c);
     await db.tx(async (q) => {
-      await q("UPDATE settings SET value = value - $1::text, updated_at = now() WHERE key = 'user_photos'", [email]);
+      await q("UPDATE settings SET value = value - $1::text, updated_at = now() WHERE key = 'user_photos' AND jsonb_typeof(value) = 'object'", [email]);
       await event(q, null, actor, "settings", "Removed their photo");
     });
     dropSettings(db);
