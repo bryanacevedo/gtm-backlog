@@ -114,6 +114,8 @@ export function resolveTeamColors(stored: Record<string, string> | null | undefi
   return { color, free: PALETTE_HEX.filter((h) => !holder[h]), holder, inPalette };
 }
 
+/** Retained and unused: the app draws every team tile in the accent (Bryan, 2026-11-13), so no screen reads or writes team colours any more.
+    The setting, its validation and its tests stay so a stored value is never lost and the choice can come back. */
 /** Validates a whole team_colors value. Returns the cleaned map, or an error in words. */
 export function checkTeamColors(v: unknown): { value: Record<string, string> } | { error: string } {
   if (!v || typeof v !== "object" || Array.isArray(v)) return { error: "Team colours are a list of team and colour." };

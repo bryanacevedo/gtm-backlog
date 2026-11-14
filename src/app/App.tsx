@@ -3,8 +3,8 @@ import { OPEN, teamsOf } from "../shared/domain";
 import { MoveDialog, NewRequest, type PendingMove } from "./forms";
 import { isTyping, linkClick, navigate, parseRoute, useLocation } from "./lib";
 import { actorPrompt, load, setActor, useStore } from "./store";
-import { SettingsDialog, TeamMarkButton } from "./settings";
-import { Avatar, Dialog, Icon, Keys, Toasts } from "./ui";
+import { SettingsDialog } from "./settings";
+import { Avatar, Dialog, Icon, Keys, TeamTile, Toasts } from "./ui";
 import { Board } from "./views/Board";
 import { ItemPage } from "./views/ItemPage";
 import { Queue } from "./views/Queue";
@@ -99,7 +99,7 @@ export function App() {
           const to = active ? "/" : `/?team=${encodeURIComponent(t)}`; // the selected team is the filter; picking it again clears it
           return (
             <div key={t} className="team-line">
-              <TeamMarkButton team={t} />
+              <TeamTile name={t} />
               <a href={to} className="team-link" aria-current={active ? "true" : undefined} onClick={linkClick(to)}>{t}<span className="count">{n}</span></a>
             </div>
           );

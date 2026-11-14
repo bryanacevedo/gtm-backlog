@@ -36,11 +36,10 @@
   --toast: #18181B;
   --toast-ink: #FAFAFA;
   /* A person with no photo: deep ink initials on a pale ground of one hue, picked by name (personHue in ui.tsx). Eight pairs, ground (pg) and ink (pi).
-     Hue belongs to people; a team is a saturated tile, an AI owner the near-black disc. Colour here identifies, it never signals a state. */
+     Hue belongs to people; a team is a tile in the accent, an AI owner the near-black disc. Colour here identifies, it never signals a state. */
   --pg-0: #FDDEDD; --pi-0: #78292E; --pg-1: #D7EDDA; --pi-1: #005725; --pg-2: #CCEEED; --pi-2: #00585A; --pg-3: #D1EBFB; --pi-3: #004F7A;
   --pg-4: #DDE6FE; --pi-4: #314282; --pg-5: #E9E1FB; --pi-5: #523779; --pg-6: #F6DEF0; --pi-6: #6A2D5F; --pg-7: #ECECEE; --pi-7: #3F3F46;
   --agent: #18181B;
-  --team: var(--ink-4);
 
   --sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
   --mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -102,14 +101,15 @@ p { margin: 0; }
 /* The team tile: one element, three sizes (18, 24 md, 32 lg). The glyph is an inline svg on a 24 grid; the stroke is set per size so it lands
    between 1.45 and 2 CSS px on screen. The letters show only for a team with no glyph. The class holds "av" so the type-size lint treats them as avatar initials. */
 .team-av { display: inline-grid; place-items: center; flex: none; width: 18px; height: 18px; margin-right: 7px; border-radius: 5px;
-  background: var(--team); color: var(--white); font: 600 9.5px/1 var(--sans); letter-spacing: 0.02em; vertical-align: middle;
-  position: relative; top: -1px; margin-top: -4px; margin-bottom: -4px; user-select: none; } /* design-lint: allow team identity colour, approved by Bryan */
+  background: var(--accent); color: var(--accent-ink); font: 600 9.5px/1 var(--sans); letter-spacing: 0.02em; vertical-align: middle;
+  position: relative; top: -1px; margin-top: -4px; margin-bottom: -4px; user-select: none; }
 .team-av svg { display: block; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .team-av.md { width: 24px; height: 24px; border-radius: 7px; margin-right: 8px; font-size: 12px; top: 0; margin-top: 0; margin-bottom: 0; }
 .team-av.md svg { width: 18px; height: 18px; stroke-width: 2.2; }
 .team-av.lg { width: 32px; height: 32px; border-radius: 9px; margin-right: 10px; font-size: 14px; top: 0; margin-top: 0; margin-bottom: 0; }
 .team-av.lg svg { width: 24px; height: 24px; stroke-width: 2; }
 .req .meta .team-av, .ship-row .by .team-av { margin-left: 4px; }
+.team-line > .team-av { margin: 0 7px 0 1px; top: 0; }
 .team-eyebrow { display: flex; align-items: center; font: var(--t-data); color: var(--ink-2); }
 
 /* ------------------------------------------------------------------- shell */
@@ -644,21 +644,12 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 .settings { display: grid; gap: 22px; }
 .set-block { display: grid; gap: 10px; }
 .set-block h3 { font: var(--t-section); }
-.swatches { display: grid; grid-template-columns: repeat(5, 24px); gap: 12px; }
-.swatches.big { grid-template-columns: repeat(8, 28px); gap: 12px; }
-.swatches button { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; transition: transform 100ms ease, box-shadow 150ms ease; }
-.swatches.big button { width: 28px; height: 28px; }
+.swatches { display: grid; grid-template-columns: repeat(8, 28px); gap: 12px; }
+.swatches button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; transition: transform 100ms ease, box-shadow 150ms ease; }
 .swatches button:active:not(:disabled) { transform: scale(0.92); }
 .swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--ink-1); }
-/* A colour another team holds is a hollow ring and cannot be pressed. */
-.swatches button:disabled { background: transparent !important; box-shadow: inset 0 0 0 2px var(--c); opacity: 0.32; cursor: not-allowed; }
 .swatches button:focus-visible { outline: 2px solid var(--ink-1); outline-offset: 3px; border-radius: 50%; }
 .swatch-block { display: grid; gap: 10px; }
-.pop-foot { font: var(--t-meta); color: var(--ink-3); min-height: 18px; }
-.pop { position: fixed; z-index: 45; width: 196px; display: grid; gap: 10px; padding: 12px; border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--overlay); animation: fade 120ms ease; }
-.pop .swatches button { border-radius: 7px; }
-.pop .swatches button:focus-visible { border-radius: 7px; }
-.pop-head { font: 500 13px/18px var(--sans); color: var(--ink-1); }
 .photo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .photo-row .av.lg { width: 44px; height: 44px; font-size: 16px; margin-right: 4px; }
 .set-block .error-text:empty { display: none; }
@@ -669,16 +660,12 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 .team-row { display: flex; align-items: center; gap: 8px; height: 40px; border-bottom: 1px solid var(--line); color: var(--ink-1); }
 .team-row .tile-btn { width: 36px; height: 36px; margin: 0 4px 0 -2px; border-radius: 11px; }
 .team-pick { display: grid; gap: 14px; padding: 12px 0 14px; border-bottom: 1px solid var(--line); }
-/* In the team picker a colour is a tile, not a circle: it is the shape the choice will take. The accent picker keeps its circles. */
-.team-pick .swatches { grid-template-columns: repeat(10, 28px); gap: 10px; }
-.team-pick .swatches button { width: 28px; height: 28px; border-radius: 8px; }
-.team-pick .swatches button:focus-visible { border-radius: 8px; }
 .shape-set { display: grid; grid-template-columns: repeat(9, 32px); gap: 10px; }
 .shape-set button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 9px; background: none; transition: transform 100ms ease-out, box-shadow 150ms ease; }
 .shape-set button .team-av { margin: 0; }
 .shape-set button:active:not(:disabled) { transform: scale(0.94); }
 .shape-set button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--ink-1); }
-/* A glyph another team holds shows its outline only, and cannot be pressed (the same rule as a taken colour). */
+/* A glyph another team holds shows its outline only, and cannot be pressed. */
 .shape-set button:disabled { cursor: not-allowed; }
 .shape-set button:disabled .team-av { background: none; color: var(--ink-4); box-shadow: inset 0 0 0 1px var(--line-2); }
 .pick-label { font: var(--t-meta); color: var(--ink-3); margin-bottom: -6px; }
@@ -757,23 +744,23 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 @media (max-width: 760px) {
   .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .rail {
-    z-index: 20; height: auto; flex-direction: row; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none;
+    z-index: 20; height: auto; flex-direction: row; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none;
     padding: 4px max(12px, env(safe-area-inset-left, 0px)); border-right: 0; border-bottom: 1px solid var(--line);
   }
   .rail::-webkit-scrollbar { display: none; }
   .ws, .rail-group, .team-line, .rail-foot .me:not(.fixed), .rail-foot .add-name, .rail-foot .acct { display: none; }
   .rail { flex-wrap: wrap; align-content: flex-start; }
   /* The environment word and the signed-in face sit at the right end of the nav row. */
-  .rail-foot { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; margin: 0 0 0 auto; padding: 0; border-top: 0; }
+  .rail-foot { display: flex; align-items: center; gap: 0; flex: 0 0 auto; margin: 0 0 0 auto; padding: 0; border-top: 0; }
   .rail-foot .me.fixed { width: auto; height: 44px; padding: 0 6px; }
   .settings-row { width: 44px; height: 44px; padding: 0; justify-content: center; }
   .settings-row span { display: none; }
   .rail-foot .me.fixed span:not(.av) { display: none; }
-  .env-phone { display: block; margin-left: 0; padding: 0 6px; }
-  .new-btn { width: auto; height: 44px; padding: 0 10px; margin: 0 4px 0 0; justify-content: center; flex: none; }
-  .new-btn .long, .new-btn kbd { display: none; }
-  .new-btn .short { display: inline; }
-  .nav-link { flex: none; gap: 5px; height: 44px; padding: 0 7px; }
+  /* One row at 375: New is the plus alone (its aria-label stays), no counts, Settings an icon, the word Demo at the end. */
+  .env-phone { display: block; margin-left: 0; padding: 0 4px; }
+  .new-btn { width: 44px; height: 44px; padding: 0; margin: 0 2px 0 0; justify-content: center; flex: none; }
+  .new-btn .long, .new-btn .short, .new-btn kbd { display: none; }
+  .nav-link { flex: none; gap: 5px; height: 44px; padding: 0 6px; }
   .nav-link svg { display: none; }
   .nav-link .count { display: none; }
   .btn.compact, .tab { height: 36px; }
@@ -852,10 +839,8 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
   .scrim.sheet { place-items: end stretch; padding: 0; }
   .dialog.sheet { width: 100%; max-height: 88vh; padding: 18px 16px 24px; border-radius: 14px 14px 0 0; }
   .dialog.sheet h2 { font: 600 14px/20px var(--sans); }
-  .swatches.big { grid-template-columns: repeat(4, 36px); gap: 14px 22px; }
-  .swatches.big button { width: 36px; height: 36px; }
-  .team-pick .swatches { grid-template-columns: repeat(5, 36px); gap: 12px 18px; }
-  .team-pick .swatches button { width: 36px; height: 36px; border-radius: 10px; }
+  .swatches { grid-template-columns: repeat(4, 36px); gap: 14px 22px; }
+  .swatches button { width: 36px; height: 36px; }
   .shape-set { grid-template-columns: repeat(5, 36px); gap: 12px 18px; }
   .shape-set button { width: 36px; height: 36px; }
   .team-row { height: 44px; }

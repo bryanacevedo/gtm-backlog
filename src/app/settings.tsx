@@ -1,24 +1,14 @@
-/* Settings: the accent colour and the teams (colour and glyph, picked together), in one place. The team picker also opens from a team's tile in the rail. */
+/* Settings: the accent colour and the teams' glyphs, in one place. Every team tile is drawn in the accent, so a team is told apart by its glyph. */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState } from "react";
 import { teamsOf } from "../shared/domain";
 import { GLYPHS } from "../shared/glyphs";
-import { ACCENT_SWATCHES, TEAM_PALETTE, accentError, normalizeHex } from "../shared/settings";
+import { ACCENT_SWATCHES, accentError, normalizeHex } from "../shared/settings";
 import { squareJpeg } from "./photo";
 import { savePhoto, saveSetting, toast, useStore } from "./store";
-import { Avatar, Dialog, TeamTile, useTeamColors, useTeamGlyphs } from "./ui";
+import { Avatar, Dialog, TeamTile, useTeamGlyphs } from "./ui";
 
-/* ------------------------------------------------------------ team colours */
-
-/** Saves one team's new colour: everyone who holds a palette colour keeps theirs, this team takes the new one. */
-async function pickTeamColor(team: string, hex: string, held: Record<string, string>) {
-  const next: Record<string, string> = {};
-  for (const [h, t] of Object.entries(held)) if (t !== team) next[t] = h;
-  next[team] = hex;
-  const err = await saveSetting("team_colors", next);
-  if (err) toast(err, "error");
-}
+/* ------------------------------------------------------------ team glyphs */
 
 /** Saves one team's glyph (an id, or null for the letters): every team that shows a glyph keeps it, this team takes the new one. */
 async function pickTeamGlyph(team: string, glyph: string | null, glyphs: Record<string, string | null>) {
@@ -29,32 +19,9 @@ async function pickTeamGlyph(team: string, glyph: string | null, glyphs: Record<
   if (err) toast(err, "error");
 }
 
-/** The ten colours. Taken ones are hollow and cannot be pressed, the team's own has the ink ring, a count of free ones sits under the grid. */
-export function TeamSwatches({ team, onPicked }: { team: string; onPicked?: () => void }) {
-  const { holder, free } = useTeamColors();
-  const mine = Object.entries(holder).find(([, t]) => t === team)?.[0];
-  return (
-    <div className="swatch-block">
-      <div className="swatches" role="group" aria-label={`${team} colour`}>
-        {TEAM_PALETTE.map(({ hex, name }) => {
-          const other = holder[hex] && holder[hex] !== team ? holder[hex] : null;
-          return (
-            // design-lint: allow team identity colour, approved by Bryan
-            <button key={hex} type="button" style={{ background: hex, ["--c" as string]: hex }} disabled={!!other} aria-pressed={hex === mine}
-              aria-label={other ? `${name}, taken by ${other}` : hex === mine ? `${name}, ${team}'s colour` : `${name}, free`}
-              onClick={() => { if (hex !== mine) void pickTeamColor(team, hex, holder); onPicked?.(); }} />
-          );
-        })}
-      </div>
-      <span className="pop-foot">{free.length ? `${free.length} free` : mine ? "No free colours" : "No free colour yet. Change another team's first."}</span>
-    </div>
-  );
-}
-
-/** The sixteen glyphs and the letters, each drawn in the team's own colour. One a team holds is an outline and cannot be pressed; the team's own has the ring. */
+/** The sixteen glyphs and the letters, each drawn in the accent. One a team holds is an outline and cannot be pressed; the team's own has the ring. */
 export function TeamGlyphs({ team }: { team: string }) {
   const { glyph, holder } = useTeamGlyphs();
-  const color = useTeamColors().color[team];
   const mine = glyph[team];
   return (
     <div className="swatch-block">
@@ -65,42 +32,15 @@ export function TeamGlyphs({ team }: { team: string }) {
             <button key={g.id} type="button" disabled={!!other} aria-pressed={g.id === mine} title={g.label}
               aria-label={other ? `${g.label}, taken by ${other}` : g.id === mine ? `${g.label}, ${team}'s glyph` : g.label}
               onClick={() => { if (g.id !== mine) void pickTeamGlyph(team, g.id, glyph); }}>
-              <TeamTile name={team} color={color} glyph={g.id} />
+              <TeamTile name={team} glyph={g.id} />
             </button>
           );
         })}
         <button type="button" aria-pressed={mine === null} title="Letters" aria-label={mine === null ? `Letters, ${team}'s tile` : "Letters"} onClick={() => { if (mine !== null) void pickTeamGlyph(team, null, glyph); }}>
-          <TeamTile name={team} color={color} glyph={null} />
+          <TeamTile name={team} glyph={null} />
         </button>
       </div>
     </div>
-  );
-}
-
-/** A team's tile in the rail; pressing it opens the colour grid under it. */
-export function TeamMarkButton({ team }: { team: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
-  const [at, setAt] = useState({ left: 0, top: 0 });
-  useLayoutEffect(() => { const r = ref.current?.getBoundingClientRect(); if (open && r) setAt({ left: r.left - 8, top: r.bottom + 6 }); }, [open]);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => { const t = e.target as Node; if (!pop.current?.contains(t) && !ref.current?.contains(t)) setOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); ref.current?.focus(); } };
-    document.addEventListener("pointerdown", away); document.addEventListener("keydown", key, true);
-    pop.current?.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
-    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", key, true); };
-  }, [open]);
-  return (
-    <>
-      <button ref={ref} type="button" className={`tile-btn${open ? " on" : ""}`} aria-label={`Change ${team} colour`} aria-expanded={open} onClick={() => setOpen((o) => !o)}><TeamTile name={team} /></button>
-      {open && createPortal(
-        <div ref={pop} className="pop" role="dialog" aria-label={`${team} colour`} style={at}>
-          <span className="pop-head">{team} colour</span>
-          <TeamSwatches team={team} onPicked={() => { setOpen(false); ref.current?.focus(); }} />
-        </div>, document.body)}
-    </>
   );
 }
 
@@ -132,7 +72,7 @@ function AccentPicker() {
   return (
     <section className="set-block" aria-labelledby="set-accent">
       <h3 id="set-accent">Accent</h3>
-      <div className="swatches big" role="group" aria-label="Accent colour">
+      <div className="swatches" role="group" aria-label="Accent colour">
         {ACCENT_SWATCHES.map(({ hex, name }) => (
           // design-lint: allow the accent swatches are the choice itself
           <button key={hex} type="button" style={{ background: hex, ["--c" as string]: hex }} aria-pressed={hex === accent} aria-label={name} title={name} onClick={() => { setDraft(""); void use(hex); }} />
@@ -186,7 +126,7 @@ function YourPhoto() {
 
 /* ------------------------------------------------------------------- sheet */
 
-function TeamColours() {
+function TeamGlyphRows() {
   const items = useStore((s) => s.data!.items);
   const [open, setOpen] = useState<string | null>(null);
   return (
@@ -196,10 +136,10 @@ function TeamColours() {
         {teamsOf(items).map((t) => (
           <div key={t}>
             <div className="team-row">
-              <button type="button" className={`tile-btn${open === t ? " on" : ""}`} aria-label={`Change ${t} colour and glyph`} aria-expanded={open === t} onClick={() => setOpen(open === t ? null : t)}><TeamTile name={t} size="lg" /></button>
+              <button type="button" className={`tile-btn${open === t ? " on" : ""}`} aria-label={`Change ${t} glyph`} aria-expanded={open === t} onClick={() => setOpen(open === t ? null : t)}><TeamTile name={t} size="lg" /></button>
               <span>{t}</span>
             </div>
-            {open === t && <div className="team-pick"><span className="pick-label">Colour</span><TeamSwatches team={t} /><span className="pick-label">Glyph</span><TeamGlyphs team={t} /></div>}
+            {open === t && <div className="team-pick"><TeamGlyphs team={t} /></div>}
           </div>
         ))}
       </div>
@@ -214,7 +154,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="settings">
         {real && <YourPhoto />}
         <AccentPicker />
-        <TeamColours />
+        <TeamGlyphRows />
       </div>
     </Dialog>
   );

@@ -5,7 +5,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { createPortal } from "react-dom";
 import { label, teamsOf, type Stage } from "../shared/domain";
 import { AGENT_GLYPH, AGENT_NAMES, glyphById, monogram, resolveTeamGlyphs, type TeamGlyphState } from "../shared/glyphs";
-import { fallbackColor, pickPhoto, resolveTeamColors, type TeamColorState } from "../shared/settings";
+import { pickPhoto } from "../shared/settings";
 import { dismiss, useStore } from "./store";
 
 /* ------------------------------------------------------------------ stages */
@@ -36,18 +36,8 @@ export function StageSelect({ stage, silent = false, moves, onMove }: { stage: S
 
 /* ------------------------------------------------------------- people, teams */
 
-/* Team colours are identity, not state: a tile in the team's colour with its glyph tells teams apart at a glance (Bryan kept the
-   colour, 2026-11-12, and picked the tile, 2026-11-13). The colour comes from a validated palette in the settings (shared/settings.ts),
-   never a free hex, the glyph from a closed set of sixteen (shared/glyphs.ts), and no two teams share either. */
-let colorCache: { stored: unknown; teams: string; out: TeamColorState } | null = null;
-export function useTeamColors(): TeamColorState {
-  const stored = useStore((s) => s.data?.meta.settings.team_colors);
-  const items = useStore((s) => s.data?.items);
-  const teams = teamsOf(items ?? []);
-  const key = teams.join("|");
-  if (!colorCache || colorCache.stored !== stored || colorCache.teams !== key) colorCache = { stored, teams: key, out: resolveTeamColors(stored, teams) };
-  return colorCache.out;
-}
+/* A team tile is one colour for every team: the accent, with the accent's own ink for the glyph (Bryan, 2026-11-13: "no color wins").
+   What tells teams apart is the glyph, from a closed set of sixteen (shared/glyphs.ts), and no two teams share one. */
 let glyphCache: { stored: unknown; teams: string; out: TeamGlyphState } | null = null;
 export function useTeamGlyphs(): TeamGlyphState {
   const stored = useStore((s) => s.data?.meta.settings.team_glyphs);
@@ -103,14 +93,12 @@ export function Avatar({ name, size, src }: { name: string | null; size?: "sm" |
   );
 }
 
-/** The team tile: a rounded square in the team's colour with its glyph in white line (the team's letters only when it has no glyph).
+/** The team tile: a rounded square in the accent with its glyph in the accent's ink (the team's letters only when it has no glyph).
     18px in rails, rows and cards, "md" 24px in an item header, "lg" 32px in Settings. It identifies, it never signals a state. */
-export function TeamTile({ name, size, color, glyph }: { name: string; size?: "md" | "lg"; color?: string; glyph?: string | null }) {
-  const colors = useTeamColors(), glyphs = useTeamGlyphs();
-  const hex = color ?? colors.color[name] ?? fallbackColor(name);
+export function TeamTile({ name, size, glyph }: { name: string; size?: "md" | "lg"; glyph?: string | null }) {
+  const glyphs = useTeamGlyphs();
   const g = glyphById(glyph !== undefined ? glyph : glyphs.glyph[name]);
-  // design-lint: allow team identity colour, approved by Bryan
-  return <span className={`team-av${size ? " " + size : ""}`} style={{ ["--team" as string]: hex }} aria-hidden="true">{g ? <svg viewBox="0 0 24 24"><path d={g.d} /></svg> : monogram(name)}</span>;
+  return <span className={`team-av${size ? " " + size : ""}`} aria-hidden="true">{g ? <svg viewBox="0 0 24 24"><path d={g.d} /></svg> : monogram(name)}</span>;
 }
 
 export function Team({ name }: { name: string }) {

@@ -2,7 +2,7 @@
    Rendered per request, so the stale mark and the order always match what the demo itself would show today. */
 
 import { glyphById, monogram, resolveTeamGlyphs } from "../shared/glyphs.ts";
-import { accentHover, resolveTeamColors } from "../shared/settings.ts";
+import { accentHover } from "../shared/settings.ts";
 import { sampleQueue } from "./seed.ts";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
@@ -14,9 +14,9 @@ const NIL = `<span class="nil">–</span>`;
 /** The stage figures and the ranked rows, for the `<!--queue-->` slot. */
 export function signinQueueHtml(nowMs: number = Date.now()): string {
   const q = sampleQueue(nowMs);
-  const color = resolveTeamColors(null, q.teams).color, glyph = resolveTeamGlyphs(null, q.teams).glyph;
-  // The same tile the app draws (TeamTile in ui.tsx): the team's colour, its glyph in white line, the letters when it has none.
-  const tile = (t: string) => `<span class="team-av" style="--team:${color[t]}" aria-hidden="true">${glyph[t] ? `<svg viewBox="0 0 24 24"><path d="${glyphById(glyph[t])!.d}"/></svg>` : esc(monogram(t))}</span>`;
+  const glyph = resolveTeamGlyphs(null, q.teams).glyph;
+  // The same tile the app draws (TeamTile in ui.tsx): the accent, its glyph in the accent's ink, the letters when it has none.
+  const tile = (t: string) => `<span class="team-av" aria-hidden="true">${glyph[t] ? `<svg viewBox="0 0 24 24"><path d="${glyphById(glyph[t])!.d}"/></svg>` : esc(monogram(t))}</span>`;
   const cell = (v: number | null, unit = "") => `<td class="num in">${v == null ? NIL : `${num(v)}${unit ? `<span class="unit">${unit}</span>` : ""}`}</td>`;
   const body = q.rows.map((r) => `
           <tr>
