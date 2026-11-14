@@ -79,12 +79,15 @@ if (hosted) {
   let real: Promise<Db> | null = null;
   const openReal = (): Promise<Db> => {
     if (real) return real;
-    const p = (async () => {
+    // A real database that never answers must fail fast (the page then says "not reachable"), not hang the request.
+    const open = (async () => {
       const d = await postgresJs(realUrl!);
       try { await migrate(d, migrations); } catch (e) { await d.close().catch(() => {}); throw e; }
       console.log("Real space ready (migrations applied).");
       return d;
     })();
+    const p = Promise.race([open, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Real database did not answer within 30 seconds.")), 30_000).unref())]);
+    open.catch(() => {}); // a late failure after the race was lost is already reported through p
     real = p;
     p.catch((e) => { console.error("Real space failed to open:", e); setTimeout(() => { if (real === p) real = null; }, 15_000).unref(); });
     return p;

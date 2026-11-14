@@ -34,6 +34,8 @@ export interface AppConfig {
   accent?: string;
   /** GITHUB_TOKEN: raises the limit when a pasted pull request is looked up on GitHub. Real space only, never logged. */
   githubToken?: string;
+  /** How long the settings read is kept, in ms (default 5000; 0 turns the cache off). Every write drops it at once. */
+  settingsTtlMs?: number;
   /** Replaceable in tests. */
   fetch?: typeof fetch;
   /** Hosted mode: choose the space per request (or answer with a Response, such as a refusal). */
@@ -47,6 +49,10 @@ const ITEM_COLS = `id, title, problem, team, requester, touches, link, stage::te
 
 const WORK_COLS = "id, item_id, kind, url, title, state, meta, created_at, created_by";
 const LOG_COLS = "id, item_id, date::text AS date, metric, value, unit, note, source_url, created_at";
+
+const SLOW_STATE_MS = 2000;
+/** A short label for a query in Server-Timing: the table it reads. */
+const spanName = (sql: string) => /\bFROM\s+(\w+)/i.exec(sql)?.[1] ?? "query";
 
 const newId = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 const isUrl = (s: unknown) => typeof s === "string" && /^https?:\/\/\S+$/.test(s);
@@ -68,20 +74,37 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     if (cfg.accent?.trim() && (!hex || accentError(hex))) console.warn("ACCENT is ignored: it must be a six-digit colour that white text can be read on (contrast 4.5 to 1 or better).");
     return hex && !accentError(hex) ? hex : DEFAULT_ACCENT;
   })();
-  const readSettings = async (db: Db): Promise<Settings> => {
-    // `value` is aliased: db.clean() turns any column called value into a number (the ship log's), and a setting is JSON.
-    const rows = await db.query<{ key: string; val: unknown }>("SELECT key, value AS val FROM settings");
-    const stored = Object.fromEntries(rows.map((r) => [r.key, r.val]));
+  /* One read of the settings table serves both the settings and the photos (they are rows of it), and is kept for a few
+     seconds per database so a page load costs fewer round trips. Every write to settings or user_photos drops it at once. */
+  const ttl = cfg.settingsTtlMs ?? 5000;
+  const cache = new WeakMap<Db, { at: number; rows: Promise<{ key: string; val: unknown }[]> }>();
+  // `value` is aliased: db.clean() turns any column called value into a number (the ship log's), and a setting is JSON.
+  type SettingRow = { key: string; val: unknown };
+  const settingRows = (q: Db["query"], db: Db): Promise<SettingRow[]> => {
+    const hit = cache.get(db);
+    if (hit && Date.now() - hit.at < ttl) return hit.rows;
+    const rows = q<{ key: string; val: unknown }>("SELECT key, value AS val FROM settings");
+    if (ttl > 0) {
+      const entry = { at: Date.now(), rows };
+      cache.set(db, entry);
+      rows.catch(() => { if (cache.get(db) === entry) cache.delete(db); });
+    }
+    return rows;
+  };
+  const dropSettings = (db: Db) => { cache.delete(db); };
+  const readSettings = async (db: Db, rows: Promise<SettingRow[]> = settingRows(db.query.bind(db), db)): Promise<Settings> => {
+    const stored = Object.fromEntries((await rows).map((r) => [r.key, r.val]));
     const accent = normalizeHex(stored.accent);
     const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
     return { accent: accent && !accentError(accent) ? accent : defaultAccent, team_colors: obj(stored.team_colors) as Record<string, string>, team_glyphs: obj(stored.team_glyphs) as Record<string, string | null> };
   };
 
   /** Uploaded photos by person's name. The addresses they are stored under never leave the server. */
-  const readPhotos = async (db: Db): Promise<Record<string, string>> => {
-    const [row] = await db.query<{ val: Record<string, { name?: unknown; photo?: unknown }> | null }>("SELECT value AS val FROM settings WHERE key = 'user_photos'");
+  const readPhotos = async (db: Db, rows: Promise<SettingRow[]> = settingRows(db.query.bind(db), db)): Promise<Record<string, string>> => {
+    const row = (await rows).find((r) => r.key === "user_photos");
+    const val = row?.val as Record<string, { name?: unknown; photo?: unknown }> | null | undefined;
     const out: Record<string, string> = {};
-    if (row?.val && typeof row.val === "object") for (const v of Object.values(row.val)) if (v && typeof v.name === "string" && typeof v.photo === "string" && "value" in checkPhoto(v.photo)) out[v.name] = v.photo;
+    if (val && typeof val === "object") for (const v of Object.values(val)) if (v && typeof v.name === "string" && typeof v.photo === "string" && "value" in checkPhoto(v.photo)) out[v.name] = v.photo;
     return out;
   };
 
@@ -114,14 +137,26 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
 
   app.get("/api/state", async (c) => {
     const db = dbOf(c);
+    // Count and time every query this request makes, so Server-Timing shows where a slow load went.
+    const t0 = performance.now();
+    const spans: { name: string; ms: number }[] = [];
+    const q: Db["query"] = async (text, params) => {
+      const t = performance.now();
+      try { return await db.query(text, params) as never; } finally { spans.push({ name: spanName(text), ms: performance.now() - t }); }
+    };
+    const rows = settingRows(q, db);
+    // All reads at once: items, ship log, events, work links, and the one settings read (settings and photos share it).
     const [items, shipLog, events, workLinks, settings, photos] = await Promise.all([
-      db.query<Item>(`SELECT ${ITEM_COLS} FROM items`),
-      db.query<ShipLogEntry>(`SELECT ${LOG_COLS} FROM ship_log ORDER BY date DESC, created_at DESC`),
-      db.query<EventRow>("SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400"),
-      db.query<WorkLink>(`SELECT ${WORK_COLS} FROM work_links ORDER BY created_at DESC`),
-      readSettings(db),
-      readPhotos(db),
+      q<Item>(`SELECT ${ITEM_COLS} FROM items`),
+      q<ShipLogEntry>(`SELECT ${LOG_COLS} FROM ship_log ORDER BY date DESC, created_at DESC`),
+      q<EventRow>("SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400"),
+      q<WorkLink>(`SELECT ${WORK_COLS} FROM work_links ORDER BY created_at DESC`),
+      readSettings(db, rows),
+      readPhotos(db, rows),
     ]);
+    const total = performance.now() - t0;
+    c.header("Server-Timing", [`total;dur=${total.toFixed(1)}`, `queries;desc="${spans.length}"`, ...spans.map((s, i) => `q${i + 1}-${s.name};dur=${s.ms.toFixed(1)}`)].join(", "));
+    if (total > SLOW_STATE_MS) console.warn(`Slow /api/state: ${Math.round(total)} ms, ${spans.length} queries (${spans.map((s) => `${s.name} ${Math.round(s.ms)} ms`).join(", ")}).`);
     return c.json({ items, shipLog, events, workLinks, meta: { demo: c.get("space").demo, writeKey: !cfg.resolve && Boolean(cfg.writeKey), now: new Date().toISOString(), settings, photos, ...c.get("space").meta } });
   });
 
@@ -339,6 +374,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       await q("INSERT INTO settings (key, value, updated_at) VALUES ($1, $2::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()", [key, JSON.stringify(checked.value)]);
       await event(q, null, actor, "settings", key === "accent" ? `Set the accent colour to ${checked.value}` : key === "team_glyphs" ? "Changed the team glyphs" : "Changed the team colours");
     });
+    dropSettings(db);
     return c.json({ key, value: checked.value, settings: await readSettings(db) });
   });
 
@@ -360,6 +396,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
         [JSON.stringify({ [email]: { name: actor, photo: checked.value } })]);
       await event(q, null, actor, "settings", "Changed their photo");
     });
+    dropSettings(db);
     return c.json({ photos: await readPhotos(db) });
   });
   app.delete("/api/me/photo", async (c) => {
@@ -370,6 +407,7 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       await q("UPDATE settings SET value = value - $1::text, updated_at = now() WHERE key = 'user_photos'", [email]);
       await event(q, null, actor, "settings", "Removed their photo");
     });
+    dropSettings(db);
     return c.json({ photos: await readPhotos(db) });
   });
 

@@ -48,15 +48,30 @@ export async function pglite(dataDir?: string): Promise<Db> {
   };
 }
 
-export async function postgresJs(url: string, opts: { max?: number } = {}): Promise<Db> {
+export const QUERY_LIMIT_MS = 20_000;
+/** Rejects with a plain message when `p` has not settled within `ms`; the timer never outlives the promise. */
+export function withLimit<T>(p: Promise<T>, ms: number = QUERY_LIMIT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const late = new Promise<never>((_, rej) => { timer = setTimeout(() => rej(new Error(`The database did not answer within ${Math.round(ms / 1000)} seconds.`)), ms); });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+}
+
+export async function postgresJs(url: string, opts: { max?: number; limitMs?: number } = {}): Promise<Db> {
   const { default: postgres } = await import("postgres");
   // prepare:false keeps it compatible with transaction-mode poolers (Supabase pooler, Hyperdrive).
-  const sql = postgres(url, { prepare: false, max: opts.max ?? 5, connection: { TimeZone: "UTC" }, types: { date: { to: 1082, from: [1082], serialize: (x: string) => x, parse: (x: string) => x } } });
-  const query = async <T>(text: string, params: unknown[] = []) => clean<T>(await sql.unsafe<Row[]>(text, params as never[]));
+  const sql = postgres(url, { prepare: false, max: opts.max ?? 5, connect_timeout: 10,
+    // A free host sleeps and wakes: connections left open across a sleep are dead but look alive, and a query on one waits for minutes.
+    // So idle connections are dropped after 10 s, none lives past 10 minutes, and TCP keep-alive probes every 30 s.
+    idle_timeout: 10, max_lifetime: 600, keep_alive: 30,
+    connection: { TimeZone: "UTC" }, types: { date: { to: 1082, from: [1082], serialize: (x: string) => x, parse: (x: string) => x } } });
+  // Nothing waits on the database for more than 20 s (opts.limitMs): a stuck query fails with a plain message instead of hanging the request.
+  const ms = opts.limitMs ?? QUERY_LIMIT_MS;
+  const limit = <T>(p: Promise<T>): Promise<T> => withLimit(p, ms);
+  const query = async <T>(text: string, params: unknown[] = []) => clean<T>(await limit(sql.unsafe<Row[]>(text, params as never[])));
   return {
     query,
-    tx: (fn) => sql.begin(async (t) => fn(async <T>(text: string, params: unknown[] = []) => clean<T>(await t.unsafe<Row[]>(text, params as never[])))) as Promise<never>,
-    exec: async (script) => { await sql.begin(async (t) => { await t.unsafe(script); }); },
+    tx: (fn) => limit(sql.begin(async (t) => fn(async <T>(text: string, params: unknown[] = []) => clean<T>(await t.unsafe<Row[]>(text, params as never[]))))) as Promise<never>,
+    exec: async (script) => { await limit(sql.begin(async (t) => { await t.unsafe(script); })); },
     close: () => sql.end({ timeout: 5 }),
     // A transaction-level lock: held by one open transaction (safe behind transaction-mode poolers), released at commit.
     withLock: <T>(fn: () => Promise<T>) => sql.begin(async (t) => {
