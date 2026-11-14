@@ -71,6 +71,7 @@ With `DATABASE_URL` or the Google settings missing, the app runs demo-only and o
 | `PUBLIC_DEMO` | free host | Set to `1` on a small host so the demo opens from `samples/demo-snapshot.tgz` (see PROJECT-STATUS). |
 | `ACCENT` | branding | Optional. The accent colour (buttons, selected controls, focus) as a six-digit hex such as `#C2410C`, used by any space that has not saved one in Settings. White text must read on it at 4.5 to 1 or better; one that does not is ignored with a warning. Default is the near-black ink. |
 | `GITHUB_TOKEN` | work links | Optional. Raises GitHub's limit when a pasted pull request link is looked up for its title and state (real space only; the public demo never calls GitHub). Never logged. |
+| `ANTHROPIC_API_KEY` | proposed scores | Optional. Turns on Claude's proposed Impact, Reach, Confidence and Effort for requests in triage (real space only; the public demo shows recorded sample proposals and makes no call). `SCORING_MODEL` is not read: the model is `claude-haiku-5-5` in `src/server/scoring.ts`. Never logged. |
 
 Sign-in turns on only when `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `PUBLIC_URL` and one of the two allowlist settings are all present and valid; the server log says what is missing.
 

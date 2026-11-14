@@ -21,6 +21,8 @@ export interface HostedDeps {
   realDb: (() => Promise<Db>) | null;
   auth: AuthConfig | null;
   writeKey?: string;
+  /** ANTHROPIC_API_KEY: proposed scores for the real space only. */
+  anthropicKey?: string;
   /** The ACCENT variable: the accent for a space that has not stored one. */
   accent?: string;
   /** GITHUB_TOKEN, for looking up pasted pull requests in the real space. */
@@ -90,6 +92,6 @@ export function createHosted(d: HostedDeps) {
     return { db: d.demoDb, demo: true, meta: { ...meta, space: "demo", user: user ? { name: user.name, email: user.email, picture: cleanPicture(user.picture) } : null } };
   };
 
-  app.route("/", createApp(() => d.demoDb, { writeKey: d.writeKey, demo: true, resolve, accent: d.accent, githubToken: d.githubToken, fetch: d.fetch }));
+  app.route("/", createApp(() => d.demoDb, { writeKey: d.writeKey, demo: true, resolve, accent: d.accent, githubToken: d.githubToken, anthropicKey: d.anthropicKey, fetch: d.fetch }));
   return app;
 }

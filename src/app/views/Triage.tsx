@@ -1,18 +1,20 @@
 /* Triage as an inbox: requests on the left, the decision on the right, and a live
    preview of where the request lands in the queue before anyone accepts it. */
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CONFIDENCE, IMPACT_RUBRIC, OPEN, SCORE_HELP, rank, score, type Item, type ScoreWord } from "../../shared/domain";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { OPEN, rank, score, type Item } from "../../shared/domain";
+import { FIELD_WORD, SCORE_FIELDS, TRUST_MIN, trustOf, type Proposal, type ScoreField } from "../../shared/scoring";
 import type { Shared } from "../App";
 import { ago, agoShort, fmtScore, isTyping, linkClick } from "../lib";
-import { moveItem, patchItem, toast, useStore } from "../store";
-import { Avatar, Icon, Team, Tip } from "../ui";
+import { ensureProposal, loadProposals, moveItem, patchItem, toast, useStore } from "../store";
+import { ScoreInputs, type Draft } from "../score-inputs";
+import { Avatar, Icon, Team } from "../ui";
 
-type Draft = { impact: number; reach: number; confidence: number; effort_days: number };
 const DEFAULTS: Draft = { impact: 3, reach: 25, confidence: 80, effort_days: 3 };
-const draftOf = (i: Item): Draft => ({
-  impact: i.impact ?? DEFAULTS.impact, reach: i.reach ?? DEFAULTS.reach,
-  confidence: i.confidence ?? DEFAULTS.confidence, effort_days: i.effort_days ?? DEFAULTS.effort_days,
+/** What the inputs start at: the request's own values, else the proposal, else the plain starting values. */
+const draftOf = (i: Item, p?: Proposal | null): Draft => ({
+  impact: i.impact ?? p?.impact ?? DEFAULTS.impact, reach: i.reach ?? p?.reach ?? DEFAULTS.reach,
+  confidence: i.confidence ?? p?.confidence ?? DEFAULTS.confidence, effort_days: i.effort_days ?? p?.effort_days ?? DEFAULTS.effort_days,
 });
 
 export function Triage({ shared }: { shared: Shared }) {
@@ -28,6 +30,7 @@ export function Triage({ shared }: { shared: Shared }) {
   const seen = useRef(new Set<string>());
 
   useEffect(() => { if (sel) seen.current.add(sel.id); }, [sel]);
+  useEffect(() => { void loadProposals(); }, []);
 
   const step = (d: number) => {
     if (!list.length) return;
@@ -44,6 +47,7 @@ export function Triage({ shared }: { shared: Shared }) {
     const ok = (changed ? await patchItem(item.id, draft) : true) && await moveItem(item.id, "idea", { silent: true });
     setLeaving(null);
     if (!ok) return;
+    void loadProposals();
     const i = waiting.indexOf(item);
     const next = waiting[i + 1] ?? waiting[i - 1];
     setSelId(next?.id ?? null);
@@ -106,8 +110,16 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
   item: Item; items: Item[]; declinedView: boolean; shared: Shared;
   onAccept: (i: Item, d: Draft) => void; onBack: () => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(draftOf(item));
+  const proposal = useStore((st) => st.proposals.list.find((p) => p.item_id === item.id && !p.resolved_at) ?? null);
+  const pending = useStore((st) => st.proposals.pending.includes(item.id));
+  const unavailable = useStore((st) => st.proposals.unavailable[item.id]);
+  const [draft, setDraft] = useState<Draft>(draftOf(item, proposal));
+  const [bad, setBad] = useState<ScoreField[]>([]);
   const [busy, setBusy] = useState(false);
+  const touched = useRef(false);
+  // A proposal that lands after the request was opened fills the inputs, unless someone has already changed one.
+  useEffect(() => { if (!declinedView) void ensureProposal(item.id); }, [item.id, declinedView]);
+  useEffect(() => { if (!touched.current) setDraft(draftOf(item, proposal)); }, [proposal?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const { pos, rows } = placement(items, item, draft);
   const s = score(draft)!;
   const merged = item.merged_into ? items.find((i) => i.id === item.merged_into) : null;
@@ -116,7 +128,7 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
     if (declinedView) return;
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey || document.querySelector(".scrim")) return;
-      if (e.key === "a" && !busy) { e.preventDefault(); go(); }
+      if (e.key === "a" && !busy && !bad.length) { e.preventDefault(); go(); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -146,10 +158,8 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
         ) : (
           <div className="decide">
             <div className="decide-inputs">
-              <Steps label="Impact" word="impact" n={5} value={draft.impact} onChange={(v) => setDraft({ ...draft, impact: v })} show={impactShow(draft.impact)} titleFor={(n) => IMPACT_RUBRIC[n]} />
-              <Slider label="Reach" word="reach" min={0} max={500} step={5} value={draft.reach} onChange={(v) => setDraft({ ...draft, reach: v })} show={`${draft.reach}/wk`} />
-              <Steps label="Confidence" word="confidence" n={3} value={CONFIDENCE.indexOf(draft.confidence as 50 | 80 | 100) + 1} onChange={(v) => setDraft({ ...draft, confidence: CONFIDENCE[v - 1] })} show={`${draft.confidence}%`} titleFor={(n) => `${CONFIDENCE[n - 1]}%`} />
-              <Slider label="Effort" word="effort" min={0.5} max={30} step={0.5} value={draft.effort_days} onChange={(v) => setDraft({ ...draft, effort_days: v })} show={`${draft.effort_days} ${draft.effort_days === 1 ? "day" : "days"}`} />
+              <div className="prop-line hint" aria-live="polite">{proposalLine(proposal, pending, unavailable)}</div>
+              <ScoreInputs value={draft} proposal={proposal} onChange={(d) => { touched.current = true; setDraft(d); }} onValid={(f, ok) => setBad((x) => (ok ? x.filter((y) => y !== f) : x.includes(f) ? x : [...x, f]))} />
             </div>
             <div className="decide-rank" aria-live="polite">
               <span className="hint">Lands in the queue at</span>
@@ -158,12 +168,13 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
             </div>
           </div>
         )}
+        {!declinedView && <TrustReport />}
       </div>
       <div className="decision-actions">
         {declinedView ? (
           <button className="btn primary" type="button" onClick={() => moveItem(item.id, "triage")}>Reopen request</button>
         ) : (<>
-          <button className="btn primary" type="button" onClick={go} disabled={busy}>{busy ? "Accepting…" : "Accept"} <kbd>A</kbd></button>
+          <button className="btn primary" type="button" onClick={go} disabled={busy || bad.length > 0}>{busy ? "Accepting…" : "Accept"} <kbd>A</kbd></button>
           <button className="btn quiet" type="button" onClick={() => shared.requestMove({ item, to: "declined", mode: "decline" })}>Decline <kbd>D</kbd></button>
         </>)}
       </div>
@@ -206,32 +217,33 @@ function Tick({ value }: { value: string }) {
   return <b key={k} className={k ? "tick" : undefined}>{value}</b>;
 }
 
-/** The impact number and its rubric word, so the scale reads as a reading, not a bare 3. */
-export const impactShow = (n: number) => <>{n}<span className="rub"> · {IMPACT_RUBRIC[n]}</span></>;
-
-export function Steps({ label, word, n, value, onChange, show, titleFor }: { label: string; word: ScoreWord; n: number; value: number; onChange: (v: number) => void; show: ReactNode; titleFor: (n: number) => string }) {
-  const id = `st-${label.toLowerCase()}`;
-  return (
-    <div className="in-row">
-      <span className="lab" id={id}><Tip lines={SCORE_HELP[word]}>{label}</Tip></span>
-      <span className="steps" role="group" aria-labelledby={id}>
-        {Array.from({ length: n }, (_, i) => i + 1).map((v) => (
-          <button key={v} type="button" className={v <= value ? "f" : undefined} aria-pressed={v === value} aria-label={`${label} ${titleFor(v)}`} title={titleFor(v)} onClick={() => onChange(v)}><i /></button>
-        ))}
-      </span>
-      <span className="val">{show}</span>
-    </div>
-  );
+/** One plain line about where the inputs came from. */
+function proposalLine(p: Proposal | null, pending: boolean, unavailable?: string) {
+  if (p) {
+    const guesses = p.guesses.length;
+    return p.source === "stand-in"
+      ? "Sample proposal. The demo makes no live call."
+      : `Proposed by ${p.model}${p.examples_used ? `, using ${p.examples_used} of your past decisions` : ", before any of your decisions to learn from"}${guesses ? `. ${guesses === 1 ? "One value is a guess" : `${guesses} values are guesses`}.` : "."}`;
+  }
+  if (pending) return "Proposing scores…";
+  if (unavailable) return `${unavailable} These are starting values, not proposals.`;
+  return "";
 }
 
-export function Slider({ label, word, min, max, step, value, onChange, show }: { label: string; word: ScoreWord; min: number; max: number; step: number; value: number; onChange: (v: number) => void; show: ReactNode }) {
-  const id = `sl-${label.toLowerCase()}`;
-  const pct = ((value - min) / (max - min)) * 100;
+/* How far the proposals have been trusted: the share accepted unchanged and the drift per input, as the Shipped screen lays out its figures. */
+function TrustReport() {
+  const list = useStore((s) => s.proposals.list);
+  const loaded = useStore((s) => s.proposals.loaded);
+  const t = useMemo(() => trustOf(list), [list]);
+  if (!loaded) return null;
+  if (t.decided < TRUST_MIN) return <div className="trust meters"><div className="meter"><span className="label">Proposal accuracy, decisions so far</span><span className="fig">{t.decided}<span className="unit"> of {TRUST_MIN}</span></span></div></div>;
+  const unit = (f: ScoreField) => (t.drift[f].unit === "points" ? ` ${f === "confidence" ? "pts" : "pt"}` : "%");
   return (
-    <div className="in-row">
-      <span className="lab" id={`${id}-l`}><Tip lines={SCORE_HELP[word]}>{label}</Tip></span>
-      <input id={id} aria-labelledby={`${id}-l`} className="range" type="range" min={min} max={max} step={step} value={value} style={{ ["--p" as string]: `${pct}%` }} onChange={(e) => onChange(Number(e.target.value))} />
-      <span className="val">{show}</span>
+    <div className="trust meters" role="group" aria-label="How the proposals have held up">
+      <div className="meter"><span className="label">Accepted unchanged</span><span className="fig">{Math.round((t.unchanged / t.decided) * 100)}<span className="unit">%</span></span><span className="note">{t.unchanged} of {t.decided}</span></div>
+      {SCORE_FIELDS.map((f) => (
+        <div className="meter" key={f}><span className="label">{FIELD_WORD[f]} drift</span><span className="fig">±{t.drift[f].mean < 10 ? t.drift[f].mean.toFixed(1) : Math.round(t.drift[f].mean)}<span className="unit">{unit(f)}</span></span><span className="note">{t.drift[f].changed} changed</span></div>
+      ))}
     </div>
   );
 }

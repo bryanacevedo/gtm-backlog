@@ -6,7 +6,7 @@ import { planMove } from "../forms";
 import { ago, fmtDay, fmtNum, fmtScore, isTyping, linkClick, navigate } from "../lib";
 import { addLink, logResult, moveItem, patchItem, removeLink, useStore } from "../store";
 import { Avatar, Empty, Icon, Inline, StageSelect, Team, TeamTile, Tip } from "../ui";
-import { Slider, Steps, impactShow } from "./Triage";
+import { ScoreInputs, type Draft } from "../score-inputs";
 
 /* The one forward move of each stage is the page's primary action. Everything else is reached from the stage word. */
 const PRIMARY: Partial<Record<Stage, { to: Stage; text: string }>> = {
@@ -185,9 +185,10 @@ function describe(kind: string, detail: string) {
 
 function ScoreSection({ item, now }: { item: Item; now: Date }) {
   const [editing, setEditing] = useState(false);
-  const init = () => ({ impact: item.impact ?? 3, reach: item.reach ?? 25, confidence: item.confidence ?? 80, effort_days: item.effort_days ?? 3 });
+  const init = (): Draft => ({ impact: item.impact ?? 3, reach: item.reach ?? 25, confidence: item.confidence ?? 80, effort_days: item.effort_days ?? 3 });
   const [d, setD] = useState(init);
   const [busy, setBusy] = useState(false);
+  const [bad, setBad] = useState<string[]>([]);
   useEffect(() => { if (!editing) setD(init()); }, [item, editing]); // eslint-disable-line react-hooks/exhaustive-deps
   const s = score(item);
   const stale = isScoreStale(item, now);
@@ -203,14 +204,11 @@ function ScoreSection({ item, now }: { item: Item; now: Date }) {
       <div className="score-card">
         {editing ? (
           <div className="score-edit">
-            <Steps label="Impact" word="impact" n={5} value={d.impact} onChange={(v) => setD({ ...d, impact: v })} show={impactShow(d.impact)} titleFor={(n) => IMPACT_RUBRIC[n]} />
-            <Slider label="Reach" word="reach" min={0} max={500} step={5} value={d.reach} onChange={(v) => setD({ ...d, reach: v })} show={`${d.reach}/wk`} />
-            <Steps label="Confidence" word="confidence" n={3} value={CONFIDENCE.indexOf(d.confidence as 50 | 80 | 100) + 1} onChange={(v) => setD({ ...d, confidence: CONFIDENCE[v - 1] })} show={`${d.confidence}%`} titleFor={(n) => `${CONFIDENCE[n - 1]}%`} />
-            <Slider label="Effort" word="effort" min={0.5} max={30} step={0.5} value={d.effort_days} onChange={(v) => setD({ ...d, effort_days: v })} show={`${d.effort_days} ${d.effort_days === 1 ? "day" : "days"}`} />
+            <ScoreInputs value={d} onChange={setD} onValid={(f, ok) => setBad((b) => (ok ? b.filter((x) => x !== f) : b.includes(f) ? b : [...b, f]))} />
             <div className="panel-actions">
               <span className="hint">New score {fmtScore(score(d)!)}</span>
               <button className="btn quiet compact" type="button" onClick={() => setEditing(false)}>Cancel</button>
-              <button className="btn primary compact" type="button" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save score"}</button>
+              <button className="btn primary compact" type="button" onClick={save} disabled={busy || bad.length > 0}>{busy ? "Saving…" : "Save score"}</button>
             </div>
           </div>
         ) : (<>

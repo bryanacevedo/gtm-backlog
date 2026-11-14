@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from "react";
 import type { EventRow, Item, ShipLogEntry, Stage } from "../shared/domain";
 import { DEFAULT_ACCENT, accentHover, type Settings } from "../shared/settings";
+import type { Proposal } from "../shared/scoring";
 import type { WorkLink } from "../shared/work";
 
 export interface Snapshot {
@@ -17,14 +18,15 @@ export interface Snapshot {
 
 export interface Toast { id: number; text: string; tone: "info" | "error"; undo?: () => void; undoKey?: string }
 
-type State = { data: Snapshot | null; loadError: string | null; toasts: Toast[]; actor: string | null; flash: string | null };
+type Proposals = { list: Proposal[]; loaded: boolean; pending: string[]; unavailable: Record<string, string>; model: string | null };
+type State = { proposals: Proposals; data: Snapshot | null; loadError: string | null; toasts: Toast[]; actor: string | null; flash: string | null };
 
 const ACTOR_KEY = "gtm-backlog.actor";
 const KEY_KEY = "gtm-backlog.write-key";
 const safeGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const safeSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* storage blocked: keep it in memory */ } };
 
-let state: State = { data: null, loadError: null, toasts: [], actor: safeGet(ACTOR_KEY), flash: null };
+let state: State = { proposals: { list: [], loaded: false, pending: [], unavailable: {}, model: null }, data: null, loadError: null, toasts: [], actor: safeGet(ACTOR_KEY), flash: null };
 const subs = new Set<() => void>();
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; subs.forEach((f) => f()); };
 
@@ -238,3 +240,35 @@ export async function removeLink(itemId: string, link: WorkLink): Promise<boolea
 
 const short = (s: string) => (s.length > 40 ? s.slice(0, 38) + "…" : s);
 const stageName = (s: Stage) => ({ triage: "Triage", idea: "Idea", building: "Building", live: "Live", declined: "Declined", retired: "Retired" })[s];
+
+
+/* -------------------------------------------------------- proposed scores */
+
+const putProposals = (p: Partial<Proposals>) => set({ proposals: { ...state.proposals, ...p } });
+
+/** The open and recently decided proposals, once per visit to Triage (and again after a decision). */
+export async function loadProposals() {
+  try {
+    const res = await call<{ proposals: Proposal[]; model: string | null }>("GET", "/api/proposals");
+    putProposals({ list: res.proposals, loaded: true, model: res.model });
+  } catch { putProposals({ loaded: true }); }
+}
+
+/** Asks for a proposal for a request in triage (made on the server if none exists yet). A refusal or a missing key leaves the plain values. */
+export async function ensureProposal(itemId: string) {
+  const cur = state.proposals;
+  if (cur.pending.includes(itemId) || cur.unavailable[itemId] || cur.list.some((p) => p.item_id === itemId && !p.resolved_at)) return;
+  putProposals({ pending: [...cur.pending, itemId] });
+  try {
+    const res = await call<{ proposal: Proposal | null; error?: string }>("GET", `/api/items/${itemId}/proposal`);
+    const now = state.proposals;
+    putProposals({
+      pending: now.pending.filter((x) => x !== itemId),
+      list: res.proposal ? [res.proposal, ...now.list.filter((p) => p.id !== res.proposal!.id)] : now.list,
+      unavailable: res.proposal ? now.unavailable : { ...now.unavailable, [itemId]: res.error ?? "No proposal for this request." },
+    });
+  } catch (e) {
+    const now = state.proposals;
+    putProposals({ pending: now.pending.filter((x) => x !== itemId), unavailable: { ...now.unavailable, [itemId]: (e as Error).message } });
+  }
+}

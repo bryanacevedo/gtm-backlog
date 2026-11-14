@@ -306,20 +306,6 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .check input { position: absolute; opacity: 0; pointer-events: none; }
 .check:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Segmented steps for impact and confidence, and a hairline slider for counts. */
-.steps { display: flex; gap: 3px; align-items: center; height: 24px; }
-.steps button { flex: 1; height: 24px; padding: 0; border: 0; background: none; display: grid; align-items: center; }
-.steps button i { display: block; height: 6px; border-radius: 2px; background: var(--line-2); transition: background-color 150ms ease, transform 150ms var(--ease); }
-.steps button.f i { background: var(--accent); }
-.steps button:hover i { transform: scaleY(1.5); }
-.range { appearance: none; -webkit-appearance: none; width: 100%; height: 24px; margin: 0; background: transparent; cursor: pointer; }
-.range::-webkit-slider-runnable-track { height: 2px; border-radius: 1px; background: linear-gradient(var(--accent), var(--accent)) 0 / var(--p, 0%) 100% no-repeat, var(--line-2); }
-.range::-moz-range-track { height: 2px; border-radius: 1px; background: var(--line-2); }
-.range::-moz-range-progress { height: 2px; background: var(--accent); }
-.range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border-radius: 50%; background: var(--panel); box-shadow: 0 0 0 1.5px var(--accent); transition: transform 150ms var(--ease); }
-.range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--panel); border: 1.5px solid var(--accent); }
-.range:active::-webkit-slider-thumb { transform: scale(1.15); }
-
 /* ------------------------------------------------------------------ stages */
 
 /* A stage is its word; state is weight and ink, never a glyph or a colour. */
@@ -525,8 +511,20 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 .decide-inputs { padding: 18px 20px; display: grid; gap: 14px; border-right: 1px solid var(--line); }
 .in-row { display: grid; grid-template-columns: 86px minmax(0, 1fr) 190px; align-items: center; gap: 14px; }
 .in-row .lab { color: var(--ink-2); }
-.in-row .val { font: 500 13px/1 var(--mono); text-align: right; color: var(--ink-1); white-space: nowrap; }
-.in-row .val .rub { font: var(--t-data); color: var(--ink-3); }
+.in-row.wide { grid-template-columns: 86px minmax(0, 1fr); align-items: start; }
+.in-row.wide .lab { padding-top: 5px; }
+.in-ctl { display: grid; gap: 5px; min-width: 0; }
+.in-ctl .checks { align-items: center; }
+.rub { color: var(--ink-3); font: var(--t-meta); margin-left: 10px; }
+.num-in { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.num-in .input { width: 84px; min-height: 30px; padding: 5px 10px; text-align: right; font: 500 13px/18px var(--mono); }
+.num-in .u { color: var(--ink-3); font: var(--t-meta); }
+.why { color: var(--ink-3); font: var(--t-meta); max-width: 62ch; }
+.why b { color: var(--ink-1); font-weight: 600; }
+.why .was { color: var(--ink-3); }
+.prop-line { min-height: 18px; }
+.trust { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.meter .note { font: var(--t-meta); color: var(--ink-3); }
 .decide-rank { padding: 18px 20px; display: grid; gap: 8px; align-content: start; }
 .decide-rank .big { display: flex; align-items: baseline; gap: 8px; }
 .decide-rank .big b { display: inline-block; font: 500 20px/26px var(--mono); letter-spacing: -0.03em; }
@@ -710,8 +708,6 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
   *, *::before, *::after { transition-property: opacity, color, background-color, box-shadow, visibility !important; transition-duration: 100ms !important; }
   .page, .swap, .scrim, .dialog, .toast, .decide-rank .big b.tick { animation-name: fade !important; animation-duration: 100ms !important; }
   .btn:active:not(:disabled), .new-btn:active, .tile-btn:active, .swatches button:active:not(:disabled), .shape-set button:active:not(:disabled) { transform: none; opacity: 0.7; }
-  .steps button:hover i { transform: none; opacity: 0.7; }
-  .range:active::-webkit-slider-thumb { transform: none; }
   .req.leaving { transform: none; }
 }
 /* Reduced transparency: a tint becomes a solid of the same weight, a scrim a solid. The app uses no blur. */
@@ -807,10 +803,11 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
   .inbox:not([data-open="true"]) .decision { display: none; }
   .inbox:not([data-open="true"]) .req[aria-selected="true"] { background: none; }
   .decision-head, .decision-body, .decision-actions { padding-left: 16px; padding-right: 16px; }
-  .in-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
-  .in-row > :nth-child(1) { grid-column: 1; grid-row: 1; }
-  .in-row > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
-  .in-row > :nth-child(3) { grid-column: 2; grid-row: 1; }
+  .in-row.wide { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .in-row.wide .lab { padding-top: 0; }
+  .num-in .input { min-height: 36px; }
+  .check { min-height: 36px; }
+  .rub { display: block; margin: 4px 0 0; flex-basis: 100%; }
 }
 @media (max-width: 640px) {
   /* The ledger becomes two lines per request: rank, title and score; then team and stage. The inputs live on the item page. */

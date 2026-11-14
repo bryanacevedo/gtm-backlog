@@ -12,6 +12,8 @@ import {
   type EventRow, type Item, type ShipLogEntry, type Stage,
 } from "../shared/domain.ts";
 import { DEFAULT_ACCENT, accentError, checkPhoto, checkSetting, normalizeHex, SETTING_KEYS, type SettingKey, type Settings } from "../shared/settings.ts";
+import { DEFAULT_MODEL, PROMPT_VERSION, PROPOSAL_COLS, loadExamples, makeClient, proposeWithClaude, saveProposal, standIn, type ScoringClient } from "./scoring.ts";
+import type { Proposal } from "../shared/scoring.ts";
 import { kindWord, parseWorkLink, readPullRequest, type WorkLink } from "../shared/work.ts";
 
 /** Which data space a request reaches, decided by the caller's credentials and nothing the request names. */
@@ -36,6 +38,10 @@ export interface AppConfig {
   githubToken?: string;
   /** How long the settings read is kept, in ms (default 5000; 0 turns the cache off). Every write drops it at once. */
   settingsTtlMs?: number;
+  /** ANTHROPIC_API_KEY: turns on proposed scores in the real space. Never sent to the demo, never logged. */
+  anthropicKey?: string;
+  /** Replaceable in tests: the model client for proposed scores, and the model's name. */
+  scoring?: { client?: ScoringClient; model?: string };
   /** Replaceable in tests. */
   fetch?: typeof fetch;
   /** Hosted mode: choose the space per request (or answer with a Response, such as a refusal). */
@@ -106,6 +112,42 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const out: Record<string, string> = {};
     if (val && typeof val === "object") for (const v of Object.values(val)) if (v && typeof v.name === "string" && typeof v.photo === "string" && "value" in checkPhoto(v.photo)) out[v.name] = v.photo;
     return out;
+  };
+
+  /* ------------------------------------------------------ proposed scores */
+
+  const scoringClient: ScoringClient | null = cfg.scoring?.client ?? (cfg.anthropicKey ? makeClient(cfg.anthropicKey) : null);
+  const scoringModel = cfg.scoring?.model ?? DEFAULT_MODEL;
+  const inflight = new Map<string, Promise<{ proposal: Proposal | null; error?: string }>>();
+  const latestOpen = async (q: Db["query"], itemId: string) =>
+    (await q<Proposal>(`SELECT ${PROPOSAL_COLS} FROM score_proposals WHERE item_id = $1 AND resolved_at IS NULL ORDER BY created_at DESC LIMIT 1`, [itemId]))[0] ?? null;
+
+  /** The open proposal for a request in triage, made now if there is none. The demo gets a stand-in (no call); the real space gets
+      the model, or nothing when no key is set. One request at a time per item, so two screens cannot pay twice. */
+  const ensureProposal = (db: Db, item: Item, demo: boolean): Promise<{ proposal: Proposal | null; error?: string }> => {
+    const key = `${demo ? "d" : "r"}:${item.id}`;
+    const going = inflight.get(key);
+    if (going) return going;
+    const job = (async () => {
+      const have = await latestOpen(db.query.bind(db), item.id);
+      if (have) return { proposal: have };
+      if (demo) {
+        const proposal = await saveProposal(db, item.id, { drafted: standIn(item), source: "stand-in", model: "stand-in", examples: 0 });
+        return { proposal };
+      }
+      if (!scoringClient) return { proposal: null, error: "Proposed scores are not set up on this server." };
+      try {
+        const examples = await loadExamples(db, item.id);
+        const made = await proposeWithClaude(scoringClient, item, examples, scoringModel);
+        const proposal = await saveProposal(db, item.id, { drafted: made.drafted, source: "claude", model: made.model, examples: examples.length });
+        return { proposal };
+      } catch (e) {
+        console.error("Proposed scores failed:", (e as Error).message);
+        return { proposal: null, error: "Could not propose scores for this request. Set them by hand." };
+      }
+    })().finally(() => inflight.delete(key));
+    inflight.set(key, job);
+    return job;
   };
 
   /* ---------------------------------------------------------- write gate */
@@ -186,7 +228,24 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       await event(q, id, actor, "created", requester === actor ? "Submitted the request" : `Submitted the request for ${requester}`);
       return one(q, id);
     });
+    // A new request gets its proposal now, so it is ready when it is opened. Never holds up the answer, never fails the request.
+    if (item && !c.get("space").demo && scoringClient) void ensureProposal(db, item, false).catch(() => {});
     return c.json({ item }, 201);
+  });
+
+  app.get("/api/proposals", async (c) => {
+    const db = dbOf(c);
+    const proposals = await db.query<Proposal>(`SELECT ${PROPOSAL_COLS} FROM score_proposals WHERE resolved_at IS NULL OR resolved_at > now() - interval '400 days' ORDER BY created_at DESC LIMIT 600`);
+    return c.json({ proposals, model: c.get("space").demo ? "stand-in" : scoringClient ? scoringModel : null, version: PROMPT_VERSION });
+  });
+
+  /* A GET on purpose: opening a request must not ask the viewer for a name. It only fills in what is missing, once, and is the same call as the one made on arrival. */
+  app.get("/api/items/:id/proposal", async (c) => {
+    const db = dbOf(c);
+    const item = await one(db.query.bind(db), c.req.param("id"));
+    if (!item) return bad("That item no longer exists.", 404);
+    if (item.stage !== "triage") return bad("Only a request in triage gets proposed scores.", 409);
+    return c.json(await ensureProposal(db, item, c.get("space").demo));
   });
 
   /* ---------------------------------------------------------------- edit */
@@ -271,7 +330,18 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
       await q(`UPDATE items SET ${[...keys.map((k, i) => `${k} = $${i + 2}${k === "stage" ? "::stage" : ""}`), ...extra].join(", ")} WHERE id = $1`, [item.id, ...keys.map((k) => sets[k])]);
       const detail = merged ? `Merged into “${merged.title}”` : item.stage === "triage" && to === "idea" ? "Accepted into Idea" : `${label(item.stage)} → ${label(to)}`;
       await event(q, item.id, actor, item.stage === "triage" ? "triaged" : "moved", detail);
-      return { item: await one(q, item.id) };
+      const after = await one(q, item.id);
+      // Leaving triage settles the proposal: what the request was given is kept next to what was proposed.
+      if (item.stage === "triage" && (to === "idea" || to === "declined") && after) {
+        const open = await latestOpen(q, item.id);
+        if (open) {
+          const same = to === "idea" && after.impact === open.impact && after.reach === open.reach && after.confidence === open.confidence && after.effort_days === open.effort_days;
+          await q(`UPDATE score_proposals SET resolved_at = now(), outcome = $2, accepted_impact = $3, accepted_reach = $4, accepted_confidence = $5, accepted_effort_days = $6 WHERE id = $1`,
+            [open.id, to === "declined" ? "declined" : same ? "accepted" : "adjusted", to === "idea" ? after.impact : null, to === "idea" ? after.reach : null, to === "idea" ? after.confidence : null, to === "idea" ? after.effort_days : null]);
+        }
+      }
+      // Back into triage (including a reopened one): the next proposal is made when it is opened.
+      return { item: after };
     });
     return "error" in result ? result.error! : c.json({ item: result.item });
   });
