@@ -8,6 +8,8 @@ import { SILENT_AFTER_DAYS } from "./domain.ts";
 export const CONTACT_PLACEHOLDER = "[contact link: to be added]";
 
 /** Edits last until the demo restarts: it reloads the sample on every start (a deploy, or waking after idle) and nightly at 06:00 UTC. */
+/** The same notice, short enough for one line on a phone. */
+export const DEMO_NOTICE_SHORT = "Invented data. Edits last until the demo restarts.";
 export const DEMO_NOTICE = "Sample company with invented data. Edits are shared with other visitors and last until the demo restarts. It reloads the sample on every start and every night at 06:00 UTC. Dates follow today's date.";
 export const DEMO_SAVE_LINE = "Sample backlog: this change lasts until the demo restarts (it reloads on every start and nightly at 06:00 UTC).";
 

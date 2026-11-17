@@ -1,7 +1,7 @@
 /* The demo notice (a slim bar, dismissible for the session) and the Guide: where to start, the two short paths and the plain words. */
 
 import { useState } from "react";
-import { BUYER_PATH, DEMO_NOTICE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, buyerNextStep, wordsFor } from "../shared/words";
+import { BUYER_PATH, DEMO_NOTICE, DEMO_NOTICE_SHORT, HIRING_PATH, VALUE_LINE, VIEW_WORDS, buyerNextStep, wordsFor } from "../shared/words";
 import { navigate } from "./lib";
 import { Dialog } from "./ui";
 
@@ -15,7 +15,8 @@ export function DemoBar({ onGuide }: { onGuide: () => void }) {
   return (
     <div className="demo-bar" role="region" aria-label="About this demo">
       <span className="demo-tag">Demo</span>
-      <span className="demo-text">{DEMO_NOTICE}</span>
+      <span className="demo-text demo-long">{DEMO_NOTICE}</span>
+      <span className="demo-text demo-short">{DEMO_NOTICE_SHORT}</span>
       <button className="btn text compact" type="button" onClick={onGuide}>Start here</button>
       <button className="btn text compact" type="button" onClick={() => { write(); setHidden(true); }} aria-label="Hide this notice for the session">Hide</button>
     </div>

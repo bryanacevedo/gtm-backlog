@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { columnSums } from "../src/app/board-logic";
 import { isSilent, SILENT_AFTER_DAYS, type Item, type ShipLogEntry } from "../src/shared/domain";
 import { changedFields, scoresUpdatedLine } from "../src/shared/scores-updated";
-import { BUYER_NEXT_STEP, BUYER_PATH, CONTACT_PLACEHOLDER, DEMO_NOTICE, DEMO_SAVE_LINE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, WORDS, buyerNextStep, wordsFor } from "../src/shared/words";
+import { BUYER_NEXT_STEP, BUYER_PATH, CONTACT_PLACEHOLDER, DEMO_NOTICE, DEMO_NOTICE_SHORT, DEMO_SAVE_LINE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, WORDS, buyerNextStep, wordsFor } from "../src/shared/words";
 import { signinPathsHtml } from "../src/server/signin-queue";
 import { renderSignin } from "../src/server/auth";
 
@@ -109,5 +109,16 @@ describe("text contrast", () => {
   });
   it("keeps route fade-ins at 150 ms or less", () => {
     for (const m of css.matchAll(/animation:\s*(page-in|swap-in)\s+(\d+)ms/g)) expect(Number(m[2])).toBeLessThanOrEqual(150);
+  });
+});
+
+describe("the demo bar on a phone", () => {
+  const css = readFileSync(new URL("../src/app/styles.css", import.meta.url), "utf8");
+  it("swaps the long notice for a one-line one so the bar stays within two lines at 390 px", () => {
+    expect(DEMO_NOTICE_SHORT.length).toBeLessThanOrEqual(55);
+    expect(DEMO_NOTICE_SHORT).toContain("until the demo restarts");
+    expect(DEMO_NOTICE_SHORT).not.toContain("\u2014");
+    expect(css).toMatch(/\.demo-short\s*\{\s*display:\s*none/);
+    expect(css).toMatch(/@media \(max-width: 760px\)\s*\{[^}]*\.demo-bar[\s\S]*?\.demo-long\s*\{\s*display:\s*none[\s\S]*?\.demo-short\s*\{\s*display:\s*block/);
   });
 });
