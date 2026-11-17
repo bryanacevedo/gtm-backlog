@@ -173,7 +173,8 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
           <div className="decide">
             <div className="decide-inputs">
               <div className="prop-line hint" aria-live="polite">{proposalLine(proposal, pending, unavailable)}</div>
-              {updated && <div className="scores-updated" role="status">{updated} <button className="btn text compact" type="button" onClick={() => setUpdated(null)}>Dismiss</button></div>}
+              {/* The live region is always in the page, empty, and is filled later, so screen readers announce the change. */}
+              <div role="status" className="scores-live">{updated && <div className="scores-updated">{updated} <button className="btn text compact" type="button" onClick={() => setUpdated(null)}>Dismiss</button></div>}</div>
               <ScoreInputs value={draft} proposal={proposal} onChange={(d) => { touched.current = true; setDraft(d); }} onValid={(f, ok) => setBad((x) => (ok ? x.filter((y) => y !== f) : x.includes(f) ? x : [...x, f]))} />
             </div>
             <div className="decide-rank" aria-live="polite">

@@ -11,8 +11,8 @@
   --rail: #F4F4F5;
   --ink-1: #09090B;
   --ink-2: #52525B;
-  --ink-3: #60606A; /* every text token holds 4.5:1 on every ground it sits on (tests/contrast.test.ts) */
-  --ink-4: #666670;
+  --ink-3: #5C5C64; /* every text token holds 4.5:1 on every ground it sits on (tests/simfix.test.ts, "text contrast") */
+  --ink-4: #696971; /* quietest text: about 4.5:1 at worst, with a visible step from ink-3 */
   --line: rgba(9, 9, 11, 0.08);
   --line-2: rgba(9, 9, 11, 0.14);
   --line-3: rgba(9, 9, 11, 0.24);

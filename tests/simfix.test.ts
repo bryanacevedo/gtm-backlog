@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { columnSums } from "../src/app/board-logic";
 import { isSilent, SILENT_AFTER_DAYS, type Item, type ShipLogEntry } from "../src/shared/domain";
 import { changedFields, scoresUpdatedLine } from "../src/shared/scores-updated";
-import { BUYER_NEXT_STEP, BUYER_PATH, CONTACT_PLACEHOLDER, DEMO_NOTICE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, WORDS } from "../src/shared/words";
+import { BUYER_NEXT_STEP, BUYER_PATH, CONTACT_PLACEHOLDER, DEMO_NOTICE, DEMO_SAVE_LINE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, WORDS, buyerNextStep, wordsFor } from "../src/shared/words";
 import { signinPathsHtml } from "../src/server/signin-queue";
 import { renderSignin } from "../src/server/auth";
 
@@ -27,18 +27,36 @@ describe("the vocabulary", () => {
   });
   it("tells the truth about the public demo: edits are kept, then reset", () => {
     expect(DEMO_NOTICE).toContain("invented data");
-    expect(DEMO_NOTICE).toContain("reset every night");
+    expect(DEMO_NOTICE).toContain("until the demo restarts");
+    expect(DEMO_NOTICE).toContain("on every start");
+    expect(DEMO_NOTICE).toContain("06:00 UTC");
+    expect(DEMO_SAVE_LINE).toContain("until the demo restarts");
+    expect(`${DEMO_NOTICE} ${DEMO_SAVE_LINE}`).not.toMatch(/kept until/);
+  });
+  it("hides the Next step line while the contact is a placeholder, and shows it for a real one", () => {
+    expect(buyerNextStep()).toBeNull();
+    expect(buyerNextStep("hello@example.com")).toBe("To run this on your own requests, contact us at hello@example.com.");
+  });
+  it("keeps demo-only wording out of the real space's glossary", () => {
+    const real = wordsFor(false);
+    expect(real.map((w) => w.term)).not.toContain("Tool names");
+    for (const w of real) expect(w.line, w.term).not.toMatch(/\bdemo\b|sample/i);
+    expect(real.map((w) => w.term)).toContain("Open PRs, Merged");
+    expect(wordsFor(true)).toEqual(WORDS);
+  });
+  it("describes the Board without calling Live requests open", () => {
+    expect(VIEW_WORDS.find((v) => v.name === "Board")!.line).toContain("Idea and Building (the open ones");
   });
 });
 
 describe("the landing page paths", () => {
   const html = signinPathsHtml();
-  it("shows the sample notice, both paths and the buyer's next step", () => {
+  it("shows the sample notice and both paths, and no placeholder text", () => {
     expect(html).toContain("invented data");
     expect(html).toContain("If you are hiring");
     expect(html).toContain("If you are buying");
-    expect(html).toContain("Next step:");
-    expect(html).toContain(CONTACT_PLACEHOLDER.replace(/[<>&]/g, ""));
+    expect(html).not.toContain("Next step:");
+    expect(html).not.toContain(CONTACT_PLACEHOLDER.replace(/[<>&]/g, ""));
     expect((html.match(/<li>/g) ?? []).length).toBe(HIRING_PATH.length + BUYER_PATH.length);
   });
   it("lands in the page where the template has its marker", () => {
@@ -81,6 +99,10 @@ describe("text contrast", () => {
   const grounds = ["bg", "panel", "rail", "row-hover", "row-active", "row-focus"];
   it("keeps every grey text colour at 4.5:1 or more on every ground it sits on", () => {
     for (const fg of ["ink-2", "ink-3", "ink-4"]) for (const bg of grounds) expect(ratio(token(fg), token(bg)), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+  });
+  it("keeps a visible step between ink-3 and ink-4 while both pass", () => {
+    expect(token("ink-3")).not.toBe(token("ink-4"));
+    expect(ratio(token("ink-3"), token("panel")) - ratio(token("ink-4"), token("panel"))).toBeGreaterThanOrEqual(0.7);
   });
   it("keeps the toast's muted icon colour readable on the toast", () => {
     expect(ratio(token("toast-mute"), token("toast"))).toBeGreaterThanOrEqual(4.5);

@@ -18,6 +18,7 @@ interface Drag { id: string; home: Stage; over: Stage; left: number; top: number
 export function Board({ shared }: { shared: Shared }) {
   const data = useStore((s) => s.data)!;
   const flash = useStore((s) => s.flash);
+  const sample = useStore((s) => (s.data?.meta.demo ? " Sample data." : ""));
   const [team, setTeam] = useQueryParam("team");
   const [view, setView] = useState<Stage>("building"); // the phone shows one stage at a time
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -255,7 +256,7 @@ export function Board({ shared }: { shared: Shared }) {
                 <span className="sums">
                   {sums.score != null && <span><b>{fmtScore(sums.score)}</b> score</span>}
                   {sums.unscored != null && <span><b>{sums.unscored}</b> unscored</span>}
-                  {sums.openPrs != null && <span title="Pull requests under review: proposed code changes. Sample data."><b>{sums.openPrs}</b> open {sums.openPrs === 1 ? "PR" : "PRs"}</span>}
+                  {sums.openPrs != null && <span title={`Pull requests under review: proposed code changes.${sample}`}><b>{sums.openPrs}</b> open {sums.openPrs === 1 ? "PR" : "PRs"}</span>}
                   {sums.measured != null && <span title={`Live requests with a result logged in the last ${SILENT_AFTER_DAYS} days`}><b>{sums.measured}</b> measured</span>}
                   {sums.silent != null && <span title={`Live requests with no result logged in the last ${SILENT_AFTER_DAYS} days`}><b>{sums.silent}</b> silent</span>}
                 </span>
@@ -304,6 +305,7 @@ interface CardProps {
 /* Three or four earned lines, each figure under its label in a strip below one hairline: Score and Waiting in Idea; Score, Open PRs, Merged and In build in Building;
    the latest result, Logging when silent, and days live in Live. Pull request counts come from the work links and are left out when a build has none. */
 const Card = forwardRef<HTMLElement, CardProps>(function Card({ item, now, latest, silent, prs, focused, flashed, slot, ghost, lift, style, onFocus, onPointerDown, onStage, suppress }, ref) {
+  const sample = useStore((s) => (s.data?.meta.demo ? " Sample data." : ""));
   const s = score(item);
   const href = `/item/${item.id}`;
   const stage = item.stage;
@@ -325,8 +327,8 @@ const Card = forwardRef<HTMLElement, CardProps>(function Card({ item, now, lates
         </>}
         {stage === "building" && <>
           <Cell k="Score" cls={unscored ? "word pale" : ""}>{unscored ? "None" : fmtScore(s!)}</Cell>
-          {prs.total > 0 && <Cell k="Open PRs" cls={prs.open ? "" : "pale"} title="Pull requests under review: proposed code changes not yet accepted. Sample data.">{prs.open}</Cell>}
-          {prs.total > 0 && <Cell k="Merged" cls={`${prs.merged ? "" : "pale"} wide-only`} title="Pull requests accepted into the code. Sample data.">{prs.merged}</Cell>}
+          {prs.total > 0 && <Cell k="Open PRs" cls={prs.open ? "" : "pale"} title={`Pull requests under review: proposed code changes not yet accepted.${sample}`}>{prs.open}</Cell>}
+          {prs.total > 0 && <Cell k="Merged" cls={`${prs.merged ? "" : "pale"} wide-only`} title={`Pull requests accepted into the code.${sample}`}>{prs.merged}</Cell>}
           <Cell k="In build" cls="end">{days(item.stage_changed_at, now)}</Cell>
         </>}
         {stage === "live" && <>

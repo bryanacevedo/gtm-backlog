@@ -53,20 +53,20 @@ Superseded in part (2026-11-17): team colours were later replaced by a glyph on 
 
 ## 9. The demo says what it is, in the app, and says the truth about edits (2026-11-17)
 
-**Decision:** the demo shows one slim bar on every screen (desktop and phone): "Sample company with invented data. Edits stay in this demo and reset every night at 06:00 UTC. Dates follow today's date.", with a Start here button; it can be hidden for the session. Write controls say the same before the click (a title on Accept and Decline, a line beside them in the demo). The real space shows none of it.
+**Decision:** the demo shows one slim bar on every screen (desktop and phone): "Sample company with invented data. Edits are shared with other visitors and last until the demo restarts. It reloads the sample on every start and every night at 06:00 UTC. Dates follow today's date.", with a Start here button; it can be hidden for the session. A line beside Accept and Decline repeats the fact in the demo (the titles on those two buttons describe the action instead). The real space shows none of it: the bar, that line, the "Sample data" tooltips, the hiring and buying paths and the demo-only glossary entries are all gated on the demo flag; Start here still opens in the real space with the screens and the plain words. The rail lists all teams only in the demo; the real space lists teams with open requests, as before.
 **Rejected:** copying the other desks' "changes are refused in the demo" wording.
-**Why:** this demo is editable and is reset nightly, so a refusal notice would be false. The bar states what is true. The sample day is today (the demo's dates are relative), so no frozen date is shown. The words come from `src/shared/words.ts`, which also feeds the landing page and the Start here dialog so they cannot disagree.
+**Why:** this demo is editable and reloads its sample on every start (a deploy, or waking after idle) and nightly at 06:00 UTC, so a refusal notice would be false and so would "kept until 06:00". The bar states what is true. The sample day is today (the demo's dates are relative), so no frozen date is shown. The words come from `src/shared/words.ts`, which also feeds the landing page and the Start here dialog so they cannot disagree.
 
 ## 10. Triage says when scores change under the reader (2026-11-17)
 
-**Decision:** when a proposal replaces the starting values, Triage shows "Scores updated: ... proposed new values (Impact 3 to 4, ...). It now lands at #2, was #9." with a Dismiss button, and the rank preview is not re-ranked without it. Under the trust figures one line defines Drift and says who proposes: an AI model proposes, a person decides. Pressing A with an invalid value says why nothing happened.
+**Decision:** when a proposal replaces the starting values, Triage shows "Scores updated: ... proposed new values (Impact 3 to 4, ...). It now lands at #2, was #9." with a Dismiss button, and the rank preview re-ranks at once; the line only says what moved. The line sits in a status region that is on the page empty first and filled afterwards, so screen readers announce it. Under the trust figures one line defines Drift and says who proposes: an AI model proposes, a person decides. Pressing A with an invalid value says why nothing happened.
 **Rejected:** a tooltip only; holding the proposal back until the reader asks.
 **Why:** the simulation found the rank jumping from #9 to #2 with no word. The sentence is built by `scoresUpdatedLine` in `src/shared/scores-updated.ts` and tested.
 
 ## 11. Plain words for the vocabulary, one source (2026-11-17)
 
-**Decision:** Impact, Reach, Confidence, Effort, the Score formula, Silent, Measured, Drift, proposed scores, pull requests (Open PRs, Merged) and tool names are explained in the Start here dialog; the four screens each get a one-line description (also the title of the rail link). Pull request figures and tool names in request titles are labelled sample data. Names such as Slack in request titles are sample text, not a connection.
-**Why:** the first-visit simulation flagged these as unexplained. The buyer path ends with a "Next step" line that uses a placeholder (`CONTACT_PLACEHOLDER`), not an invented address; replace it when there is a place to send a buyer.
+**Decision:** Impact, Reach, Confidence, Effort, the Score formula, Silent, Measured, Drift, proposed scores, pull requests (Open PRs, Merged) and tool names are explained in the Start here dialog; the 4 screens each get a one-line description (also the title of the rail link). Pull request figures and tool names in request titles are labelled sample data. Names such as Slack in request titles are sample text, not a connection.
+**Why:** the first-visit simulation flagged these as unexplained. The buyer path ends with a "Next step" line only when there is a real contact: while `CONTACT_PLACEHOLDER` is still a bracketed placeholder, `buyerNextStep()` returns nothing and the line is omitted on the landing page and in Start here. Replace the constant with a real link to show it.
 
 ## 12. The Live figures on Board and Shipped agree (2026-11-17)
 

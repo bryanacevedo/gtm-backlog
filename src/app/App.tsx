@@ -51,9 +51,10 @@ export function App() {
       queue: items.filter((i) => OPEN.includes(i.stage)).length,
       board: items.filter((i) => ["idea", "building", "live"].includes(i.stage)).length,
       shipped: items.filter((i) => i.live_at).length,
-      teams: teamsOf(items).map((t) => [t, items.filter((i) => OPEN.includes(i.stage) && i.team === t).length] as const),
+      // The demo lists every team (Marketing included, even at 0); the real space lists only teams with open requests.
+      teams: teamsOf(items).map((t) => [t, items.filter((i) => OPEN.includes(i.stage) && i.team === t).length] as const).filter(([, n]) => meta?.demo || n > 0),
     };
-  }, [data]);
+  }, [data, meta?.demo]);
 
   const openNew = useCallback(() => setNewOpen(true), []);
   const shared: Shared = useMemo(() => ({ openNew, requestMove: setPending, pending }), [openNew, pending]);
@@ -163,7 +164,7 @@ export function App() {
       </div>
 
       {newOpen && <NewRequest onClose={() => setNewOpen(false)} onCreated={() => { setNewOpen(false); navigate("/triage"); }} />}
-      {guideOpen && <Guide onClose={() => setGuideOpen(false)} />}
+      {guideOpen && <Guide onClose={() => setGuideOpen(false)} demo={!!meta?.demo} />}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {pending && <MoveDialog pending={pending} onClose={() => setPending(null)} />}
       {(actorPrompt.open || nameEditing) && <NameDialog initial={actor ?? ""} onDone={(n) => { setNameEditing(false); setActor(n); }} />}

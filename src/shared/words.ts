@@ -3,11 +3,13 @@
 
 import { SILENT_AFTER_DAYS } from "./domain.ts";
 
-/** A placeholder, not a real address: replace it when there is a place to send a buyer. The text says so. */
+/** A placeholder, not a real address. While it is still in this form the Next step line is not shown anywhere
+    (see buyerNextStep): put the real link here and the line appears on the landing page and in Start here. */
 export const CONTACT_PLACEHOLDER = "[contact link: to be added]";
 
-export const DEMO_NOTICE = "Sample company with invented data. Edits stay in this demo and reset every night at 06:00 UTC. Dates follow today's date.";
-export const DEMO_SAVE_LINE = "Sample backlog: this change is kept until the nightly reset at 06:00 UTC.";
+/** Edits last until the demo restarts: it reloads the sample on every start (a deploy, or waking after idle) and nightly at 06:00 UTC. */
+export const DEMO_NOTICE = "Sample company with invented data. Edits are shared with other visitors and last until the demo restarts. It reloads the sample on every start and every night at 06:00 UTC. Dates follow today's date.";
+export const DEMO_SAVE_LINE = "Sample backlog: this change lasts until the demo restarts (it reloads on every start and nightly at 06:00 UTC).";
 
 export const VALUE_LINE = "GTM engineering requests, ranked by what they are worth to revenue, from idea to live, with results after they ship.";
 
@@ -15,7 +17,7 @@ export const VALUE_LINE = "GTM engineering requests, ranked by what they are wor
 export const VIEW_WORDS: readonly { name: string; line: string }[] = [
   { name: "Triage", line: "New requests waiting for a decision. Accept puts one in the ranked queue; decline closes it." },
   { name: "Queue", line: "Every open request in rank order, highest score first." },
-  { name: "Board", line: "The same open requests as cards in 3 columns: Idea, Building and Live." },
+  { name: "Board", line: "Requests as cards in 3 columns: Idea and Building (the open ones, as in Queue) and Live (shipped)." },
   { name: "Shipped", line: "What has gone live, with the results logged after release." },
 ];
 
@@ -27,11 +29,23 @@ export const WORDS: readonly { term: string; line: string }[] = [
   { term: "Score", line: "Impact × reach × confidence ÷ effort. Higher means more value per day of work." },
   { term: "Silent", line: `A live request with no result logged in the last ${SILENT_AFTER_DAYS} days. It may still run, but nobody can say what it is doing.` },
   { term: "Measured", line: `A live request with a result logged in the last ${SILENT_AFTER_DAYS} days.` },
-  { term: "Proposed scores", line: "In Triage, an AI model proposes the 4 score inputs. A person reviews them and decides. This demo shows recorded sample proposals and makes no live call." },
+  { term: "Proposed scores", line: "In Triage, an AI model proposes the 4 score inputs. A person reviews them and decides. This demo shows sample proposals and makes no live call." },
   { term: "Drift", line: "How far a proposed value was from the value a person accepted, on average. Lower means the proposals held up." },
   { term: "Open PRs, Merged", line: "Pull requests: proposed code changes. Open means under review; merged means accepted into the code. The ones in this demo are sample data." },
   { term: "Tool names", line: "Names such as Slack, CRM or Google in request titles are sample text. Nothing in this demo connects to them." },
 ];
+
+/** Words that mean something different, or nothing, outside the demo. */
+const DEMO_ONLY_TERMS = ["Tool names"];
+const REAL_LINES: Record<string, string> = {
+  "Proposed scores": "In Triage, an AI model proposes the 4 score inputs. A person reviews them and decides.",
+  "Open PRs, Merged": "Pull requests: proposed code changes. Open means under review; merged means accepted into the code.",
+};
+/** The glossary for the space the reader is in: the demo's own sample caveats appear only in the demo. */
+export function wordsFor(demo: boolean): readonly { term: string; line: string }[] {
+  if (demo) return WORDS;
+  return WORDS.filter((w) => !DEMO_ONLY_TERMS.includes(w.term)).map((w) => ({ term: w.term, line: REAL_LINES[w.term] ?? w.line }));
+}
 
 export const HIRING_PATH: readonly string[] = [
   "Open Triage. Read a request and the scores an AI model proposed for it.",
@@ -48,3 +62,8 @@ export const BUYER_PATH: readonly string[] = [
 ];
 
 export const BUYER_NEXT_STEP = `To run this on your own requests, contact us at ${CONTACT_PLACEHOLDER}.`;
+
+/** The Next step line, or null while the contact is still the placeholder (no placeholder text is ever shown to a visitor). */
+export function buyerNextStep(contact: string = CONTACT_PLACEHOLDER): string | null {
+  return /^\[.*\]$/.test(contact) ? null : `To run this on your own requests, contact us at ${contact}.`;
+}
