@@ -14,7 +14,7 @@ The test for every screen: **a sales leader opens it cold and in 10 seconds know
 - **GTM engineer** (the owner): triages, scores, moves items, links the system that shipped, logs results.
 - **Leader**: reads the Queue and Shipped.
 
-v1 has no accounts. The app asks for a display name once, keeps it in the browser and sends it with every write, and the activity log records it. If `WRITE_KEY` is set on the server, writes also need that key.
+The demo has no accounts: the app asks for a display name once, keeps it in the browser and sends it with every write, and the activity log records it. The real backlog is behind Google sign-in for an allowlist, and its log records the Google name. Scripts can write with `WRITE_KEY`.
 
 ## One object, six stages
 
@@ -64,13 +64,13 @@ Nobody types a score. The app ranks with a shared function, and Postgres carries
 
 Monochrome by default, in the language of current engineering tools.
 
-- Color belongs to people (avatars) and teams (a 7px dot), never to chrome.
+- Color belongs to people (avatars) and to one accent, never to state. Teams are told apart by a glyph on an accent tile, not by color.
 - Selection is a soft fill, never a colored edge. No pills for metadata, no uppercase labels.
-- One action color, near-black. Hairline rings instead of heavy borders. Surfaces only where they group something real.
+- One action color, the accent: near-black unless an install sets its own. Hairline rings instead of heavy borders. Surfaces only where they group something real.
 - Geist and Geist Mono, self-hosted. Every number is tabular; data numbers are mono.
 - Motion only when state changes (150 to 280ms, ease-out): rows leave when accepted, the queue preview slides into its new order, the rank number ticks. Nothing moves at rest, and reduced-motion settings are respected.
 - Alignment is measured, not eyeballed: `scripts/audit-layout.mjs` loads every view in a real browser at five widths and fails on misaligned columns, baselines, spilled text or sideways scroll.
 
 ## Not in v1
 
-Roles and per-person accounts, multiple workspaces, Jira or Linear sync, and AI. An LLM that drafts the problem statement from a Slack thread is a good v2. Slack intake (`/request`) is planned and out of scope until the core is proven.
+Roles, multiple workspaces, and Jira or Linear sync. Claude can propose the four score inputs in triage (with `ANTHROPIC_API_KEY`); a person still accepts them. An LLM that drafts the problem statement from a Slack thread is a good v2. Slack intake (`/request`) is planned and out of scope until the core is proven.
