@@ -48,11 +48,11 @@ export function Queue({ shared }: { shared: Shared }) {
                 <th scope="col" className="pin pin-2 title">Request</th>
                 <th scope="col">Team</th>
                 <th scope="col" className="stage-col">Stage</th>
+                <th scope="col" className="num"><Tip lines={SCORE_HELP.score}>Score</Tip></th>
                 <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.impact}>Impact</Tip></th>
                 <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.reach}>Reach</Tip></th>
                 <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.confidence}>Confidence</Tip></th>
                 <th scope="col" className="num col-inputs"><Tip lines={SCORE_HELP.effort}>Effort</Tip></th>
-                <th scope="col" className="num"><Tip lines={SCORE_HELP.score}>Score</Tip></th>
                 <th scope="col" className="who">Owner</th>
                 <th scope="col" className="num" title="Days in the current stage">Age</th>
               </tr>
@@ -79,10 +79,10 @@ function Row({ item, n, focused, flashed, now, onFocus }: { item: Item; n: numbe
       <td className="title pin pin-2"><a href={href} onClick={linkClick(href)} title={item.title}>{item.title}</a></td>
       <td className="team"><Team name={item.team} /></td>
       <td className="stage-col"><StageLabel stage={item.stage} /></td>
-      {cell(item.impact)}{cell(item.reach, "/wk")}{cell(item.confidence, "%")}{cell(item.effort_days, item.effort_days === 1 ? " day" : " days")}
       <td className="num score-col" title={stale ? `Scored ${daysSince(item.scored_at!, now)} days ago. Rescore on the item page.` : undefined}>
         {s == null ? <span className="score-none">Unscored</span> : <span className={`score${stale ? " stale" : ""}`}>{fmtScore(s)}</span>}
       </td>
+      {cell(item.impact)}{cell(item.reach, "/wk")}{cell(item.confidence, "%")}{cell(item.effort_days, item.effort_days === 1 ? " day" : " days")}
       <td className="who">{item.owner && <><Avatar name={item.owner} size="sm" /> {item.owner.split(/\s+/)[0]}</>}</td>
       <td className="num age">{agoShort(item.stage_changed_at, now)}</td>
     </tr>

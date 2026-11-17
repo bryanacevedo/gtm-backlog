@@ -50,3 +50,30 @@ Superseded in part (2026-11-17): the colour is now people and one accent; teams 
 **Why:** a coloured or ink dot before a word is a banned AI tell (BRYAN-DESIGN-INSTRUMENT.md); weight carries the same information. Bryan approved it on 2026-11-12, and `docs/DESIGN-LINT-BASELINE.txt` is now empty. Screen readers still hear "(not opened yet)".
 
 Superseded in part (2026-11-17): team colours were later replaced by a glyph on an accent tile, so no dot remains.
+
+## 9. The demo says what it is, in the app, and says the truth about edits (2026-11-17)
+
+**Decision:** the demo shows one slim bar on every screen (desktop and phone): "Sample company with invented data. Edits stay in this demo and reset every night at 06:00 UTC. Dates follow today's date.", with a Start here button; it can be hidden for the session. Write controls say the same before the click (a title on Accept and Decline, a line beside them in the demo). The real space shows none of it.
+**Rejected:** copying the other desks' "changes are refused in the demo" wording.
+**Why:** this demo is editable and is reset nightly, so a refusal notice would be false. The bar states what is true. The sample day is today (the demo's dates are relative), so no frozen date is shown. The words come from `src/shared/words.ts`, which also feeds the landing page and the Start here dialog so they cannot disagree.
+
+## 10. Triage says when scores change under the reader (2026-11-17)
+
+**Decision:** when a proposal replaces the starting values, Triage shows "Scores updated: ... proposed new values (Impact 3 to 4, ...). It now lands at #2, was #9." with a Dismiss button, and the rank preview is not re-ranked without it. Under the trust figures one line defines Drift and says who proposes: an AI model proposes, a person decides. Pressing A with an invalid value says why nothing happened.
+**Rejected:** a tooltip only; holding the proposal back until the reader asks.
+**Why:** the simulation found the rank jumping from #9 to #2 with no word. The sentence is built by `scoresUpdatedLine` in `src/shared/scores-updated.ts` and tested.
+
+## 11. Plain words for the vocabulary, one source (2026-11-17)
+
+**Decision:** Impact, Reach, Confidence, Effort, the Score formula, Silent, Measured, Drift, proposed scores, pull requests (Open PRs, Merged) and tool names are explained in the Start here dialog; the four screens each get a one-line description (also the title of the rail link). Pull request figures and tool names in request titles are labelled sample data. Names such as Slack in request titles are sample text, not a connection.
+**Why:** the first-visit simulation flagged these as unexplained. The buyer path ends with a "Next step" line that uses a placeholder (`CONTACT_PLACEHOLDER`), not an invented address; replace it when there is a place to send a buyer.
+
+## 12. The Live figures on Board and Shipped agree (2026-11-17)
+
+**Decision:** Shipped shows Live, Measured and Silent beside each other, computed with the same function as the Board's Live column head (`columnSums`). A release with no result in the last 30 days reads "Last measured Sep 8, over 30 days ago", never a bare "Measured" next to Silent. The sidebar Teams group is labelled "Teams, open" and lists every team, so Marketing (no open request) has a link and a 0.
+**Why:** "3 measured, 2 silent" on the Board beside "Live 5, Silent 2" on Shipped, and "Measured Sep 8" beside "Silent" on one release, read as disagreement.
+
+## 13. Text colours are tested for contrast (2026-11-17)
+
+**Decision:** `--ink-3` is now #60606A and `--ink-4` #666670 (were #71717A and #A1A1AA), so every grey text token holds 4.5:1 on the page, panel, rail and row grounds; `tests/simfix.test.ts` ("text contrast") measures it. The toast's muted icon keeps the old light grey as `--toast-mute`. Route fade-ins are 120 ms. The Score column now sits right after Stage, so it stays on screen when the table scrolls sideways; the radio inputs of the Impact and Confidence chips fill their whole chip.
+**Why:** the old light grey measured about 2.5:1; Score was off screen at about 800 px; the radios measured 13 by 13 px.

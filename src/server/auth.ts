@@ -282,10 +282,11 @@ export function mountAuth(app: Hono<any>, d: AuthDeps) {
 
 /** Fills the built sign-in page (dist/signin.html). The message is escaped; the queue picture and the accent are trusted markup made by this server.
     A template without a slot (a test's, or the plain fallback page) just goes without. */
-export function renderSignin(template: string, message?: string, extra: { queue?: string; accent?: string } = {}): string {
+export function renderSignin(template: string, message?: string, extra: { queue?: string; accent?: string; paths?: string } = {}): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
   return template
     .replace("<!--accent-->", () => extra.accent ?? "")
     .replace("<!--queue-->", () => extra.queue ?? "")
+    .replace("<!--paths-->", () => extra.paths ?? "")
     .replace("<!--message-->", () => message ? `<p class="signin-msg" role="alert">${esc(message)}</p>` : "");
 }

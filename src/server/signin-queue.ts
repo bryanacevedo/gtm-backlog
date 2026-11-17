@@ -3,6 +3,7 @@
 
 import { glyphById, monogram, resolveTeamGlyphs } from "../shared/glyphs.ts";
 import { accentHover } from "../shared/settings.ts";
+import { BUYER_NEXT_STEP, BUYER_PATH, DEMO_NOTICE, HIRING_PATH } from "../shared/words.ts";
 import { sampleQueue } from "./seed.ts";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
@@ -45,4 +46,15 @@ export function signinQueueHtml(nowMs: number = Date.now()): string {
 /** The accent the page uses: the ACCENT variable's colour when it is usable, else nothing (the stylesheet's own ink). The page never reads a database. */
 export function signinAccentCss(hex: string | null): string {
   return hex ? `<style>:root{--accent:${hex};--accent-hover:${accentHover(hex)};--accent-ink:#FFFFFF}</style>` : "";
+}
+
+/** The two short paths and the sample notice, for the `<!--paths-->` slot under the buttons. Same words as the Start here dialog in the app. */
+export function signinPathsHtml(): string {
+  const list = (steps: readonly string[]) => `<ol>${steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>`;
+  return `<section class="la-paths" aria-label="Start here">
+        <p class="la-demo">${esc(DEMO_NOTICE)}</p>
+        <h2>If you are hiring</h2>${list(HIRING_PATH)}
+        <h2>If you are buying</h2>${list(BUYER_PATH)}
+        <p class="la-next"><b>Next step:</b> ${esc(BUYER_NEXT_STEP)}</p>
+      </section>`;
 }

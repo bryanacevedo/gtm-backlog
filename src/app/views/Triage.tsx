@@ -3,11 +3,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OPEN, rank, score, type Item } from "../../shared/domain";
+import { scoresUpdatedLine } from "../../shared/scores-updated";
 import { FIELD_WORD, SCORE_FIELDS, TRUST_MIN, trustOf, type Proposal, type ScoreField } from "../../shared/scoring";
 import type { Shared } from "../App";
 import { ago, agoShort, fmtScore, isTyping, linkClick } from "../lib";
 import { ensureProposal, loadProposals, moveItem, patchItem, toast, useStore } from "../store";
 import { ScoreInputs, type Draft } from "../score-inputs";
+import { DEMO_SAVE_LINE } from "../../shared/words";
 import { Avatar, Icon, Team } from "../ui";
 
 const DEFAULTS: Draft = { impact: 3, reach: 25, confidence: 80, effort_days: 3 };
@@ -93,7 +95,7 @@ export function Triage({ shared }: { shared: Shared }) {
             </button>
           ))}
         </div>
-        <div className="inbox-foot"><kbd>J</kbd><kbd>K</kbd> to move through requests</div>
+        <div className="inbox-foot"><kbd>J</kbd><kbd>K</kbd> move <kbd>A</kbd> accept <kbd>M</kbd> merge <kbd>D</kbd> decline</div>
       </section>
 
       <section className="decision" aria-label="Decision">
@@ -117,9 +119,17 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
   const [bad, setBad] = useState<ScoreField[]>([]);
   const [busy, setBusy] = useState(false);
   const touched = useRef(false);
+  const [updated, setUpdated] = useState<string | null>(null);
+  const demo = useStore((st) => st.data?.meta.demo);
   // A proposal that lands after the request was opened fills the inputs, unless someone has already changed one.
   useEffect(() => { if (!declinedView) void ensureProposal(item.id); }, [item.id, declinedView]);
-  useEffect(() => { if (!touched.current) setDraft(draftOf(item, proposal)); }, [proposal?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (touched.current) return;
+    const next = draftOf(item, proposal);
+    // The proposal replaced the starting values: say so, with the rank before and after, instead of moving the preview in silence.
+    if (proposal && !declinedView) setUpdated(scoresUpdatedLine(draft, next, placement(items, item, draft).pos, placement(items, item, next).pos, proposal.source === "stand-in" ? "A sample proposal" : proposal.model));
+    setDraft(next);
+  }, [proposal?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const { pos, rows } = placement(items, item, draft);
   const s = score(draft)!;
   const merged = item.merged_into ? items.find((i) => i.id === item.merged_into) : null;
@@ -128,7 +138,11 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
     if (declinedView) return;
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey || document.querySelector(".scrim")) return;
-      if (e.key === "a" && !busy && !bad.length) { e.preventDefault(); go(); }
+      if (e.key !== "a") return;
+      e.preventDefault();
+      if (busy) return;
+      if (bad.length) { toast("Not accepted yet: fix the value marked in red first.", "info"); return; }
+      go();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -159,6 +173,7 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
           <div className="decide">
             <div className="decide-inputs">
               <div className="prop-line hint" aria-live="polite">{proposalLine(proposal, pending, unavailable)}</div>
+              {updated && <div className="scores-updated" role="status">{updated} <button className="btn text compact" type="button" onClick={() => setUpdated(null)}>Dismiss</button></div>}
               <ScoreInputs value={draft} proposal={proposal} onChange={(d) => { touched.current = true; setDraft(d); }} onValid={(f, ok) => setBad((x) => (ok ? x.filter((y) => y !== f) : x.includes(f) ? x : [...x, f]))} />
             </div>
             <div className="decide-rank" aria-live="polite">
@@ -174,8 +189,9 @@ function Decision({ item, items, declinedView, shared, onAccept, onBack }: {
         {declinedView ? (
           <button className="btn primary" type="button" onClick={() => moveItem(item.id, "triage")}>Reopen request</button>
         ) : (<>
-          <button className="btn primary" type="button" onClick={go} disabled={busy || bad.length > 0}>{busy ? "Accepting…" : "Accept"} <kbd>A</kbd></button>
-          <button className="btn quiet" type="button" onClick={() => shared.requestMove({ item, to: "declined", mode: "decline" })}>Decline <kbd>D</kbd></button>
+          <button className="btn primary" type="button" onClick={go} disabled={busy || bad.length > 0} aria-keyshortcuts="A" title="Accept: moves the request into the ranked queue. Shortcut A. You can undo it.">{busy ? "Accepting…" : "Accept"} <kbd>A</kbd></button>
+          <button className="btn quiet" type="button" onClick={() => shared.requestMove({ item, to: "declined", mode: "decline" })} aria-keyshortcuts="D" title="Decline: asks for a reason before it closes the request. Shortcut D.">Decline <kbd>D</kbd></button>
+          {demo && <span className="act-line">{DEMO_SAVE_LINE}</span>}
         </>)}
       </div>
     </>
@@ -236,16 +252,17 @@ function TrustReport() {
   const loaded = useStore((s) => s.proposals.loaded);
   const t = useMemo(() => trustOf(list), [list]);
   if (!loaded) return null;
-  if (t.decided < TRUST_MIN) return <div className="trust meters"><div className="meter"><span className="label">Proposal accuracy, decisions so far</span><span className="fig">{t.decided}<span className="unit"> of {TRUST_MIN}</span></span></div></div>;
+  if (t.decided < TRUST_MIN) return <div className="trust"><div className="meters"><div className="meter"><span className="label">Proposal accuracy, decisions so far</span><span className="fig">{t.decided}<span className="unit"> of {TRUST_MIN}</span></span></div></div><p className="legend">{DRIFT_LEGEND}</p></div>;
   const unit = (f: ScoreField) => (t.drift[f].unit === "points" ? ` ${f === "confidence" ? "pts" : "pt"}` : "%");
   return (
-    <div className="trust meters" role="group" aria-label="How the proposals have held up">
+    <div className="trust"><div className="meters" role="group" aria-label="How the proposals have held up">
       <div className="meter"><span className="label">Accepted unchanged</span><span className="fig">{Math.round((t.unchanged / t.decided) * 100)}<span className="unit">%</span></span><span className="note">{t.unchanged} of {t.decided}</span></div>
       {SCORE_FIELDS.map((f) => (
         <div className="meter" key={f}><span className="label">{FIELD_WORD[f]} drift</span><span className="fig">±{t.drift[f].mean < 10 ? t.drift[f].mean.toFixed(1) : Math.round(t.drift[f].mean)}<span className="unit">{unit(f)}</span></span><span className="note">{t.drift[f].changed} changed</span></div>
       ))}
-    </div>
+    </div><p className="legend">{DRIFT_LEGEND}</p></div>
   );
 }
 
+const DRIFT_LEGEND = "Drift is how far a proposed value was from the value a person accepted, on average. An AI model proposes the scores; a person decides.";
 const short = (s: string) => (s.length > 34 ? s.slice(0, 32) + "…" : s);

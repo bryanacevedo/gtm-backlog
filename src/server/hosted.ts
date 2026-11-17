@@ -12,7 +12,7 @@ import { Hono, type Context } from "hono";
 import { createApp, type Space } from "./app.ts";
 import { cleanPicture, crossSite, mountAuth, renderSignin, safeEqual, sessionFrom, viewingDemo, type AuthConfig } from "./auth.ts";
 import type { Db } from "./db.ts";
-import { signinAccentCss, signinQueueHtml } from "./signin-queue.ts";
+import { signinAccentCss, signinPathsHtml, signinQueueHtml } from "./signin-queue.ts";
 import { accentError, normalizeHex } from "../shared/settings.ts";
 
 export interface HostedDeps {
@@ -46,7 +46,7 @@ export function createHosted(d: HostedDeps) {
   // The page needs no database: the picture is the sample's queue, the accent is the ACCENT variable's (else the stylesheet's own ink).
   const accentHex = normalizeHex(d.accent);
   const accent = signinAccentCss(accentHex && !accentError(accentHex) ? accentHex : null);
-  const page = (message?: string) => renderSignin(d.signinHtml, message, { queue: signinQueueHtml(now()), accent });
+  const page = (message?: string) => renderSignin(d.signinHtml, message, { queue: signinQueueHtml(now()), paths: signinPathsHtml(), accent });
   const realReachable = async (): Promise<boolean> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try { return await Promise.race([d.realDb!().then(() => true, () => false), new Promise<boolean>((r) => { timer = setTimeout(() => r(false), REAL_WAIT_MS); })]); } finally { clearTimeout(timer); }

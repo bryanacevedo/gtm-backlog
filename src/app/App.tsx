@@ -5,6 +5,8 @@ import { isTyping, linkClick, navigate, parseRoute, useLocation } from "./lib";
 import { actorPrompt, load, setActor, useStore } from "./store";
 import { SettingsDialog } from "./settings";
 import { Avatar, Dialog, Icon, Keys, TeamTile, Toasts } from "./ui";
+import { DemoBar, Guide } from "./guide";
+import { VIEW_WORDS } from "../shared/words";
 import { Board } from "./views/Board";
 import { ItemPage } from "./views/ItemPage";
 import { Queue } from "./views/Queue";
@@ -38,6 +40,7 @@ export function App() {
   const [pending, setPending] = useState<PendingMove | null>(null);
   const [nameEditing, setNameEditing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -48,13 +51,13 @@ export function App() {
       queue: items.filter((i) => OPEN.includes(i.stage)).length,
       board: items.filter((i) => ["idea", "building", "live"].includes(i.stage)).length,
       shipped: items.filter((i) => i.live_at).length,
-      teams: teamsOf(items).map((t) => [t, items.filter((i) => OPEN.includes(i.stage) && i.team === t).length] as const).filter(([, n]) => n > 0),
+      teams: teamsOf(items).map((t) => [t, items.filter((i) => OPEN.includes(i.stage) && i.team === t).length] as const),
     };
   }, [data]);
 
   const openNew = useCallback(() => setNewOpen(true), []);
   const shared: Shared = useMemo(() => ({ openNew, requestMove: setPending, pending }), [openNew, pending]);
-  const overlay = newOpen || keysOpen || settingsOpen || !!pending || actorPrompt.open || nameEditing;
+  const overlay = newOpen || guideOpen || keysOpen || settingsOpen || !!pending || actorPrompt.open || nameEditing;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,17 +86,17 @@ export function App() {
 
   return (
     <div className="shell">
-      <a className="sr-only" href="#main">Skip to content</a>
+      <a className="sr-only skip" href="#main">Skip to content</a>
       <nav className="rail" aria-label="Workspace">
         <div className="ws"><span className="ws-mark" aria-hidden="true"><i /></span>{meta?.space === "real" ? "GTM Backlog" : "Acme GTM"}{meta?.demo && <span className="env">Demo</span>}</div>
         <button className={`new-btn${NEW_IS_PRIMARY.includes(route.view) ? " primary" : ""}`} type="button" onClick={openNew} aria-label="New request"><Icon.plus /><span className="long">New request</span><span className="short">New</span><kbd>C</kbd></button>
         {NAV.map((n) => (
-          <a key={n.view} href={n.path} className="nav-link" aria-current={route.view === n.view && !(n.view === "queue" && activeTeam) ? "page" : undefined} onClick={linkClick(n.path)}>
+          <a key={n.view} href={n.path} className="nav-link" title={VIEW_WORDS.find((v) => v.name === n.name)?.line} aria-current={route.view === n.view && !(n.view === "queue" && activeTeam) ? "page" : undefined} onClick={linkClick(n.path)}>
             <n.icon /><span>{n.name}</span>
             {data && <span className="count">{counts[n.view]}</span>}
           </a>
         ))}
-        {counts.teams.length > 0 && <div className="rail-group">Teams</div>}
+        {counts.teams.length > 0 && <div className="rail-group" title="Open requests per team: Idea and Building. Triage and Live are not counted.">Teams, open</div>}
         {counts.teams.map(([t, n]) => {
           const active = route.view === "queue" && activeTeam === t;
           const to = active ? "/" : `/?team=${encodeURIComponent(t)}`; // the selected team is the filter; picking it again clears it
@@ -105,6 +108,7 @@ export function App() {
           );
         })}
         <div className="rail-foot">
+          <button className="settings-row" type="button" onClick={() => setGuideOpen(true)} aria-label="Start here and the words used"><Icon.help /><span>Start here</span></button>
           <button className="settings-row" type="button" onClick={() => setSettingsOpen(true)} aria-label="Settings"><Icon.sliders /><span>Settings</span></button>
           {meta?.demo && <span className="env env-phone">Demo</span>}
           {meta?.space === "real" && meta.user ? (
@@ -128,6 +132,7 @@ export function App() {
       </nav>
 
       <div className="main">
+        {meta?.demo && <DemoBar onGuide={() => setGuideOpen(true)} />}
         <main id="main" className={`page${route.view === "triage" ? " full" : ""}`} tabIndex={-1} key={route.view === "item" ? `item-${route.id}` : route.view}>
           {loadError ? (
             <div className="load-error"><p>{loadError}</p><button className="btn quiet" type="button" onClick={load}>Try again</button></div>
@@ -158,6 +163,7 @@ export function App() {
       </div>
 
       {newOpen && <NewRequest onClose={() => setNewOpen(false)} onCreated={() => { setNewOpen(false); navigate("/triage"); }} />}
+      {guideOpen && <Guide onClose={() => setGuideOpen(false)} />}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {pending && <MoveDialog pending={pending} onClose={() => setPending(null)} />}
       {(actorPrompt.open || nameEditing) && <NameDialog initial={actor ?? ""} onDone={(n) => { setNameEditing(false); setActor(n); }} />}

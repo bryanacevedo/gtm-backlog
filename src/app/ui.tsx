@@ -116,6 +116,7 @@ export const Icon = {
   plus: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>,
   back: () => <svg viewBox="0 0 16 16" {...P} strokeWidth={1.6} aria-hidden="true"><path d="m10 3.5-4.5 4.5 4.5 4.5" /></svg>,
   close: () => <svg viewBox="0 0 16 16" {...P} strokeWidth={1.6} aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8" /></svg>,
+  help: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><circle cx="8" cy="8" r="5.6" /><path d="M6.3 6.4a1.8 1.8 0 1 1 2.6 1.6c-.6.3-.9.7-.9 1.3M8 11.4v.1" /></svg>,
   sliders: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><path d="M2.5 5h5.2M11.3 5h2.2M2.5 11h2.2M8.3 11h5.2" /><circle cx="9.5" cy="5" r="1.8" /><circle cx="6.5" cy="11" r="1.8" /></svg>,
   external: () => <svg viewBox="0 0 16 16" {...P} aria-hidden="true"><path d="M6.5 3.5h-3v9h9v-3M9.5 2.5h4v4M13.5 2.5 7.5 8.5" /></svg>,
 };

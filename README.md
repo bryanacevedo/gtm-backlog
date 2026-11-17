@@ -4,7 +4,7 @@
 
 **The backlog for a GTM engineering team.** Requests land in one inbox, get ranked by what they're worth to revenue, move from idea to live, and keep reporting what they did after they ship.
 
-**Live demo:** https://gtm-backlog.onrender.com (sample data, editable, resets nightly; the free plan sleeps when idle, so the first visit can take a minute)
+**Live demo:** https://gtm-backlog.onrender.com (sample company with invented data, editable, resets nightly; the free plan sleeps when idle, so the first visit can take a minute)
 
 [![Watch the 66-second walkthrough](docs/screens/video-poster.jpg)](https://gtm-backlog.onrender.com/video/gtm-backlog.mp4)
 
@@ -125,9 +125,13 @@ More detail: [docs/SPEC.md](docs/SPEC.md) for the product, and [docs/DECISIONS.m
 - **Sample:** the 24 requests and the people. The team and their names are fictional. Avatar photos are from Unsplash (see [CREDITS.md](CREDITS.md)).
 - **Not built yet:** Slack intake (`/request`) and roles. Sign-in is all-or-nothing: everyone on the allowlist can change everything.
 
+## First visit
+
+The demo shows a slim bar on every screen: sample company, invented data, edits kept until the nightly reset. **Start here** (the bar, or the rail) opens the first step, a short path for a hiring manager and one for a buyer, a one-line description of Triage, Queue, Board and Shipped, and the plain words for Impact, Reach, Confidence, Effort, Score, Silent, Measured, Drift, proposed scores and pull requests. The same two paths are on the landing page. The buyer's next step uses a placeholder contact (`CONTACT_PLACEHOLDER` in `src/shared/words.ts`) until there is a real one.
+
 ## Keyboard
 
-`1` to `4` switch views, `j` and `k` move through rows (Triage, Queue, Board), `↵` opens, `←` and `→` move a card between stages, `a`, `m` and `d` decide in Triage, `c` opens a new request, `Esc` closes or goes back, `?` lists every key.
+`1` to `4` switch views, `j` and `k` move through rows (Triage, Queue, Board), `↵` opens, `←` and `→` move a card between stages, `a`, `m` and `d` decide in Triage (`a` with an invalid value says why it did nothing), `c` opens a new request, `Esc` closes or goes back, `?` lists every key.
 
 ## License
 

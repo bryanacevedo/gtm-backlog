@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { FLOW, isSilent, label, score, type Item, type ShipLogEntry, type Stage } from "../../shared/domain";
+import { FLOW, SILENT_AFTER_DAYS, isSilent, label, score, type Item, type ShipLogEntry, type Stage } from "../../shared/domain";
 import type { Shared } from "../App";
 import { columnsOf, columnSums, movedTo, nearestStage, pullRequests, slotIndex, stageStep } from "../board-logic";
 import { planMove } from "../forms";
@@ -255,9 +255,9 @@ export function Board({ shared }: { shared: Shared }) {
                 <span className="sums">
                   {sums.score != null && <span><b>{fmtScore(sums.score)}</b> score</span>}
                   {sums.unscored != null && <span><b>{sums.unscored}</b> unscored</span>}
-                  {sums.openPrs != null && <span><b>{sums.openPrs}</b> open {sums.openPrs === 1 ? "PR" : "PRs"}</span>}
-                  {sums.measured != null && <span><b>{sums.measured}</b> measured</span>}
-                  {sums.silent != null && <span><b>{sums.silent}</b> silent</span>}
+                  {sums.openPrs != null && <span title="Pull requests under review: proposed code changes. Sample data."><b>{sums.openPrs}</b> open {sums.openPrs === 1 ? "PR" : "PRs"}</span>}
+                  {sums.measured != null && <span title={`Live requests with a result logged in the last ${SILENT_AFTER_DAYS} days`}><b>{sums.measured}</b> measured</span>}
+                  {sums.silent != null && <span title={`Live requests with no result logged in the last ${SILENT_AFTER_DAYS} days`}><b>{sums.silent}</b> silent</span>}
                 </span>
               </div>
               <div className="col-body">
@@ -293,7 +293,7 @@ const days = (iso: string, now: Date) => {
   const m = t.match(/^(\d+) (days?)$/);
   return m ? <>{m[1]}<span className="u"> {m[2]}</span></> : <>Today</>;
 };
-const Cell = ({ k, children, cls }: { k: string; children: React.ReactNode; cls?: string }) => <span className={`cell${cls ? " " + cls : ""}`}><span className="k">{k}</span><span className="v">{children}</span></span>;
+const Cell = ({ k, children, cls, title }: { k: string; children: React.ReactNode; cls?: string; title?: string }) => <span className={`cell${cls ? " " + cls : ""}`} title={title}><span className="k">{k}</span><span className="v">{children}</span></span>;
 
 interface CardProps {
   item: Item; now: Date; latest?: ShipLogEntry; silent: boolean; prs: { open: number; merged: number; total: number };
@@ -325,14 +325,14 @@ const Card = forwardRef<HTMLElement, CardProps>(function Card({ item, now, lates
         </>}
         {stage === "building" && <>
           <Cell k="Score" cls={unscored ? "word pale" : ""}>{unscored ? "None" : fmtScore(s!)}</Cell>
-          {prs.total > 0 && <Cell k="Open PRs" cls={prs.open ? "" : "pale"}>{prs.open}</Cell>}
-          {prs.total > 0 && <Cell k="Merged" cls={`${prs.merged ? "" : "pale"} wide-only`}>{prs.merged}</Cell>}
+          {prs.total > 0 && <Cell k="Open PRs" cls={prs.open ? "" : "pale"} title="Pull requests under review: proposed code changes not yet accepted. Sample data.">{prs.open}</Cell>}
+          {prs.total > 0 && <Cell k="Merged" cls={`${prs.merged ? "" : "pale"} wide-only`} title="Pull requests accepted into the code. Sample data.">{prs.merged}</Cell>}
           <Cell k="In build" cls="end">{days(item.stage_changed_at, now)}</Cell>
         </>}
         {stage === "live" && <>
           {latest ? <Cell k={latest.metric} cls={`grow${silent ? " pale" : ""}`}>{fmtNum(latest.value)}<span className="u">{latest.unit === "%" ? "%" : ` ${latest.unit}`}</span></Cell>
             : <Cell k="Result" cls="grow word pale">None</Cell>}
-          {silent && <Cell k="Logging" cls="word strong">Silent</Cell>}
+          {silent && <Cell k="Logging" cls="word strong" title={`No result logged in the last ${SILENT_AFTER_DAYS} days.`}>Silent</Cell>}
           <Cell k="Live" cls="end">{days(item.live_at ?? item.stage_changed_at, now)}</Cell>
         </>}
         {!ghost && !slot && (

@@ -11,8 +11,8 @@
   --rail: #F4F4F5;
   --ink-1: #09090B;
   --ink-2: #52525B;
-  --ink-3: #71717A;
-  --ink-4: #A1A1AA;
+  --ink-3: #60606A; /* every text token holds 4.5:1 on every ground it sits on (tests/contrast.test.ts) */
+  --ink-4: #666670;
   --line: rgba(9, 9, 11, 0.08);
   --line-2: rgba(9, 9, 11, 0.14);
   --line-3: rgba(9, 9, 11, 0.24);
@@ -35,6 +35,7 @@
   --row-focus: #EFEFF1;
   --toast: #18181B;
   --toast-ink: #FAFAFA;
+  --toast-mute: #A1A1AA;
   /* A person with no photo: deep ink initials on a pale ground of one hue, picked by name (personHue in ui.tsx). Eight pairs, ground (pg) and ink (pi).
      Hue belongs to people; a team is a tile in the accent, an AI owner the near-black disc. Colour here identifies, it never signals a state. */
   --pg-0: #FDDEDD; --pi-0: #78292E; --pg-1: #D7EDDA; --pi-1: #005725; --pg-2: #CCEEED; --pi-2: #00585A; --pg-3: #D1EBFB; --pi-3: #004F7A;
@@ -184,6 +185,10 @@ p { margin: 0; }
 .la-what { margin-top: 10px; font: var(--t-body); color: var(--ink-2); text-wrap: balance; }
 .signin-msg { order: 3; margin: 24px 0 -8px; font: 600 13px/19px var(--sans); color: var(--ink-1); overflow-wrap: anywhere; }
 .f-demo { order: 4; margin-top: 28px !important; }
+.la-paths { order: 6; margin-top: 28px; display: grid; gap: 8px; font: var(--t-data); color: var(--ink-2); }
+.la-paths h2 { margin-top: 8px; font: var(--t-section); color: var(--ink-1); }
+.la-paths ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.la-paths p { margin: 0; }
 .f-google { order: 5; margin-top: 12px !important; }
 .btn.signin-btn { width: 100%; height: 40px; padding: 0 12px; font-size: 14px; }
 /* Google's button on a light surface: white fill, a thin border, their ink, the four-colour G at 18px, 10px before the label. Only the colours are Google's. */
@@ -239,7 +244,7 @@ p { margin: 0; }
 .me .hint { margin-left: auto; color: var(--ink-4); font: var(--t-meta); }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
-.page { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 32px 40px; flex: 1; display: flex; flex-direction: column; gap: 22px; animation: page-in 180ms var(--ease); }
+.page { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 32px 40px; flex: 1; display: flex; flex-direction: column; gap: 22px; animation: page-in 120ms var(--ease); }
 .page > * { min-width: 0; }
 .page-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 32px; }
 .page-head .actions, .page-head > .btn { align-self: center; }
@@ -303,7 +308,9 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .check { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px var(--line-2); background: var(--panel); cursor: pointer; color: var(--ink-2); user-select: none; transition: box-shadow 150ms ease, background-color 150ms ease, color 150ms ease; }
 .check:hover { box-shadow: inset 0 0 0 1px var(--line-3); }
 .check:has(input:checked) { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
-.check input { position: absolute; opacity: 0; pointer-events: none; }
+.check { position: relative; }
+/* The radio itself fills its chip, so the control is as large as the chip (30px, 36px on a phone), not the browser's 13px. */
+.check input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .check:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ------------------------------------------------------------------ stages */
@@ -441,7 +448,7 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 /* ------------------------------------------------------------------- meters */
 
 .meters { display: flex; flex-wrap: wrap; row-gap: 16px; }
-.meter { flex: 0 1 auto; min-width: 150px; display: grid; gap: 4px; align-content: start; padding: 0 28px; }
+.meter { flex: 0 1 auto; min-width: 128px; display: grid; gap: 4px; align-content: start; padding: 0 24px; }
 .meter:first-child { padding-left: 0; }
 .meter + .meter { border-left: 1px solid var(--line); }
 .meter .fig { font: 500 20px/26px var(--mono); letter-spacing: -0.03em; color: var(--ink-1); }
@@ -500,7 +507,7 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 .decision { display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
 .decision-head { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 28px; border-bottom: 1px solid var(--line); color: var(--ink-3); font: var(--t-meta); }
 .decision-body { padding: 24px 28px; display: grid; gap: 14px; align-content: start; flex: 1; }
-.swap { animation: swap-in 180ms var(--ease); }
+.swap { animation: swap-in 120ms var(--ease); }
 .decision-body .who { display: flex; align-items: center; gap: 9px; color: var(--ink-3); }
 .decision-body .who b { color: var(--ink-2); font-weight: 500; }
 .decision-body h2 { font: 600 20px/26px var(--sans); letter-spacing: -0.018em; }
@@ -683,7 +690,7 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
 .toast { display: flex; align-items: center; gap: 12px; min-height: 38px; max-width: min(480px, calc(100vw - 32px)); padding: 6px 6px 6px 14px; border-radius: var(--r-lg); background: var(--toast); color: var(--toast-ink); box-shadow: var(--overlay); font: var(--t-data); animation: toast-in 240ms var(--ease); }
 .toast .btn.text { color: var(--toast-ink); height: 28px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
 .toast .btn.text:hover { background: rgba(255, 255, 255, 0.08); color: var(--white); }
-.toast .btn.icon { color: var(--ink-4); }
+.toast .btn.icon { color: var(--toast-mute); }
 .toast .btn.icon:hover { background: rgba(255, 255, 255, 0.08); color: var(--white); }
 .toast.error { background: var(--panel); color: var(--bad); box-shadow: var(--overlay); }
 .toast.error .btn.text, .toast.error .btn.icon { color: var(--ink-2); }
@@ -753,7 +760,7 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
   .settings-row span { display: none; }
   .rail-foot .me.fixed span:not(.av) { display: none; }
   /* One row at 375: New is the plus alone (its aria-label stays), no counts, Settings an icon, the word Demo at the end. */
-  .env-phone { display: block; margin-left: 0; padding: 0 4px; }
+  .env-phone { display: none; } /* the demo notice below the header says it, with the Start here button */
   .new-btn { width: 44px; height: 44px; padding: 0; margin: 0 2px 0 0; justify-content: center; flex: none; }
   .new-btn .long, .new-btn .short, .new-btn kbd { display: none; }
   .nav-link { flex: none; gap: 5px; height: 44px; padding: 0 6px; }
@@ -851,4 +858,28 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
   .wk-row .st { grid-row: 2; grid-column: 2; font: var(--t-meta); }
   .wk-row .wk-x { grid-row: 1; grid-column: 4; }
   .wk-row .st:empty { display: none; }
+}
+
+/* ---------------------------------------------------------- demo notice, guide, notices */
+
+.demo-bar { flex: none; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 32px; border-bottom: 1px solid var(--line); background: var(--rail); color: var(--ink-2); font: var(--t-meta); }
+.demo-tag { flex: none; font: 600 12px/18px var(--sans); color: var(--ink-1); }
+.demo-text { flex: 1; min-width: 0; }
+.demo-bar .btn.text { flex: none; }
+.sr-only.skip:focus { position: fixed; z-index: 70; left: 12px; top: 12px; width: auto; height: auto; clip: auto; padding: 8px 12px; border-radius: var(--r-sm); background: var(--accent); color: var(--accent-ink); }
+.scores-updated { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--fill); color: var(--ink-1); font: var(--t-data); }
+.act-line { margin-left: auto; color: var(--ink-3); font: var(--t-meta); }
+.trust .legend { margin-top: 10px; max-width: 62ch; color: var(--ink-3); font: var(--t-meta); }
+.guide { display: grid; gap: 10px; font: var(--t-data); color: var(--ink-2); }
+.guide h3 { margin-top: 8px; font: var(--t-section); color: var(--ink-1); }
+.guide ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.guide dl { margin: 0; display: grid; gap: 8px; }
+.guide dt { color: var(--ink-1); font-weight: 500; }
+.guide dd { margin: 0; }
+.guide-lead { font: var(--t-body); color: var(--ink-1); }
+.guide-first, .guide-next { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+@media (max-width: 760px) {
+  .demo-bar { flex-wrap: wrap; padding: 6px max(16px, env(safe-area-inset-left, 0px)); }
+  .demo-text { flex-basis: 100%; order: 3; }
+  .act-line { margin-left: 0; flex-basis: 100%; }
 }

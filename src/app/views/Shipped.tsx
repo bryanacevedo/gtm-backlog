@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { isSilent, type Item, type ShipLogEntry } from "../../shared/domain";
+import { columnSums } from "../board-logic";
+import { SILENT_AFTER_DAYS, isSilent, type Item, type ShipLogEntry } from "../../shared/domain";
 import { daysSince, fmtDay, fmtMonth, fmtNum, linkClick, plural } from "../lib";
 import { useStore } from "../store";
 import { Avatar, Empty, Icon, StageLabel, Team } from "../ui";
@@ -22,6 +23,7 @@ export function Shipped() {
       meters: {
         thisMonth: shipped.filter((i) => i.live_at!.slice(0, 7) === now.toISOString().slice(0, 7)).length,
         live: live.length,
+        measured: columnSums("live", live, [], data.shipLog, now).measured ?? 0,
         silent: live.filter((i) => isSilent(i, logFor(i.id), now)).length,
         results30: data.shipLog.filter((l) => daysSince(l.date, now) <= 30).length,
       },
@@ -38,6 +40,7 @@ export function Shipped() {
       <div className="meters" role="group" aria-label="Summary">
         <Meter label={`Shipped in ${fmtMonth(now.toISOString()).split(" ")[0]}`} fig={meters.thisMonth} />
         <Meter label="Live" fig={meters.live} />
+        <Meter label="Measured" fig={meters.measured} />
         <Meter label="Silent" fig={meters.silent} attn={meters.silent > 0} />
         <Meter label="Results, last 30 days" fig={meters.results30} />
       </div>
@@ -77,7 +80,7 @@ function ShipRow({ item, log, now }: { item: Item; log: ShipLogEntry[]; now: Dat
         {latest ? (<>
           <span className="m">{latest.metric}</span>
           <span className="v">{fmtNum(latest.value)}<span className="u">{latest.unit === "%" ? "%" : ` ${latest.unit}`}</span></span>
-          <span className="d">Measured {fmtDay(latest.date, now)}{log.length > 1 ? ` · ${plural(log.length, "result")} logged` : ""}</span>
+          <span className="d">{silent ? "Last measured" : "Measured"} {fmtDay(latest.date, now)}{silent ? `, over ${SILENT_AFTER_DAYS} days ago` : ""}{log.length > 1 ? ` · ${plural(log.length, "result")} logged` : ""}</span>
         </>) : <span className="d">{item.stage === "retired" ? "No results were logged." : "No result logged yet."}</span>}
         {(silent || item.stage === "retired") && <span className="st"><StageLabel stage={item.stage} silent={silent} /></span>}
       </div>
