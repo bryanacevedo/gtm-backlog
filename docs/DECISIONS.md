@@ -35,7 +35,9 @@ Short records of the choices that shaped gtm-backlog: what was decided, what els
 
 **Decision:** every component is written for this product, styled with a small set of CSS tokens.
 **Rejected:** shadcn/ui and similar kits.
-**Why:** the kit look is recognizable at a glance and says nothing about the product. The design rules (monochrome, color only for people and one accent, no pills, motion only on change) are easier to hold with nothing to fight.
+**Why:** the kit look is recognizable at a glance and says nothing about the product. The design rules (monochrome, color only for people and teams, no pills, motion only on change) are easier to hold with nothing to fight.
+
+Superseded in part (2026-11-17): the colour is now people and one accent; teams use a glyph on an accent tile.
 
 ## 7. Alignment is tested, not eyeballed
 
@@ -44,5 +46,7 @@ Short records of the choices that shaped gtm-backlog: what was decided, what els
 
 ## 8. An unopened request is told by weight, not a dot
 
-**Decision:** in Triage, a request nobody has opened yet is set in semibold; an opened one is regular. The small dot beside its age is gone. Teams were later moved from coloured dots to a glyph on an accent tile, so no dot remains.
+**Decision:** in Triage, a request nobody has opened yet is set in semibold; an opened one is regular. The small dot beside its age is gone. Team colours (`TEAM_COLOR`, `.tdot`) stay: they identify a team, they do not signal a state.
 **Why:** a coloured or ink dot before a word is a banned AI tell (BRYAN-DESIGN-INSTRUMENT.md); weight carries the same information. Bryan approved it on 2026-11-12, and `docs/DESIGN-LINT-BASELINE.txt` is now empty. Screen readers still hear "(not opened yet)".
+
+Superseded in part (2026-11-17): team colours were later replaced by a glyph on an accent tile, so no dot remains.
