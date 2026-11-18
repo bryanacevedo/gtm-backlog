@@ -127,7 +127,7 @@ More detail: [docs/SPEC.md](docs/SPEC.md) for the product, and [docs/DECISIONS.m
 
 ## First visit
 
-The demo shows a slim bar on every screen: sample company, invented data, edits last until the demo restarts (it reloads the sample on every start and nightly at 06:00 UTC), and the Next step line stays hidden until `CONTACT_PLACEHOLDER` is replaced with a real contact. **Start here** (the bar, or the rail) opens the first step, a short path for a hiring manager and one for a buyer, a one-line description of Triage, Queue, Board and Shipped, and the plain words for Impact, Reach, Confidence, Effort, Score, Silent, Measured, Drift, proposed scores and pull requests. The same two paths are on the landing page. The buyer's Next step line appears only once `CONTACT_PLACEHOLDER` in `src/shared/words.ts` is replaced with a real contact.
+The demo shows a slim bar on every screen: sample company, invented data, edits last until the demo restarts (it reloads the sample on every start and nightly at 06:00 UTC), and the buyer path ends with a Next step line. **Start here** (the bar, or the rail) opens the first step, a short path for a hiring manager and one for a buyer, a one-line description of Triage, Queue, Board and Shipped, and the plain words for Impact, Reach, Confidence, Effort, Score, Silent, Measured, Drift, proposed scores and pull requests. The same two paths are on the landing page. The buyer's Next step is a mailto link ("Write to Bryan about your own data", `CONTACT_HREF` in `src/shared/words.ts`) on the landing page and in Start here. The Queue, the first screen, carries one quiet line saying what the backlog does, and an empty Queue says what goes there and links to Triage.
 
 ## Keyboard
 

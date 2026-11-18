@@ -886,3 +886,9 @@ body[data-dragging] .card:not(.is-slot):not(.ghost) { box-shadow: var(--ring); }
   .demo-short { display: block; }
   .act-line { margin-left: 0; flex-basis: 100%; }
 }
+
+/* The one quiet value line under the Queue heading, the buyer's contact link, and the empty-state buttons. */
+.page-lede { margin: 4px 0 16px; font: var(--t-data); color: var(--ink-3); max-width: 72ch; }
+.la-next a, .guide-next a { color: var(--ink-1); text-decoration: underline; text-underline-offset: 3px; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.empty b { color: var(--ink-2); font-weight: 600; }

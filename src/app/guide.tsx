@@ -1,7 +1,7 @@
 /* The demo notice (a slim bar, dismissible for the session) and the Guide: where to start, the two short paths and the plain words. */
 
 import { useState } from "react";
-import { BUYER_PATH, DEMO_NOTICE, DEMO_NOTICE_SHORT, HIRING_PATH, VALUE_LINE, VIEW_WORDS, buyerNextStep, wordsFor } from "../shared/words";
+import { BUYER_PATH, DEMO_NOTICE, DEMO_NOTICE_SHORT, HIRING_PATH, VALUE_LINE, VIEW_WORDS, BUYER_NEXT_STEP, wordsFor } from "../shared/words";
 import { navigate } from "./lib";
 import { Dialog } from "./ui";
 
@@ -24,7 +24,6 @@ export function DemoBar({ onGuide }: { onGuide: () => void }) {
 }
 
 export function Guide({ onClose, demo }: { onClose: () => void; demo: boolean }) {
-  const next = buyerNextStep();
   const go = (path: string) => { onClose(); navigate(path); };
   return (
     <Dialog title="Start here" onClose={onClose} closeButton>
@@ -36,7 +35,7 @@ export function Guide({ onClose, demo }: { onClose: () => void; demo: boolean })
           <ol>{HIRING_PATH.map((s) => <li key={s}>{s}</li>)}</ol>
           <h3>If you are buying</h3>
           <ol>{BUYER_PATH.map((s) => <li key={s}>{s}</li>)}</ol>
-          {next && <p className="guide-next"><b>Next step:</b> {next}</p>}
+          <p className="guide-next"><b>Next step:</b> {BUYER_NEXT_STEP.lead} <a href={BUYER_NEXT_STEP.href}>{BUYER_NEXT_STEP.text}</a></p>
         </>}
         <h3>The 4 screens</h3>
         <dl>{VIEW_WORDS.map((v) => <div key={v.name}><dt>{v.name}</dt><dd>{v.line}</dd></div>)}</dl>

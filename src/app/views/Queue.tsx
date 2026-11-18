@@ -4,6 +4,7 @@ import type { Shared } from "../App";
 import { agoShort, daysSince, fmtNum, fmtScore, linkClick, navigate, useQueryParam } from "../lib";
 import { useRowFocus } from "../rows";
 import { useStore } from "../store";
+import { VALUE_LINE, queueEmptyWords } from "../../shared/words";
 import { Avatar, Empty, StageLabel, Team, Tip } from "../ui";
 
 export function Queue({ shared }: { shared: Shared }) {
@@ -36,9 +37,15 @@ export function Queue({ shared }: { shared: Shared }) {
           </div>
         )}
       </header>
+      <p className="page-lede">{VALUE_LINE}</p>
 
       {shown.length === 0 ? (
-        <Empty>{team ? `No open requests from ${team}.` : "No open requests."}</Empty>
+        <Empty action={<span className="empty-actions">
+          <a className="btn quiet compact" href="/triage" onClick={linkClick("/triage")}>Open Triage</a>
+          {team && <button className="btn quiet compact" type="button" onClick={() => setTeam(null)}>All teams</button>}
+        </span>}>
+          <b>{queueEmptyWords(team).text}</b> {queueEmptyWords(team).hint}
+        </Empty>
       ) : (
         <div className="table-wrap">
           <table className="grid">

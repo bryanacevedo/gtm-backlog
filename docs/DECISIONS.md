@@ -66,7 +66,7 @@ Superseded in part (2026-11-17): team colours were later replaced by a glyph on 
 ## 11. Plain words for the vocabulary, one source (2026-11-17)
 
 **Decision:** Impact, Reach, Confidence, Effort, the Score formula, Silent, Measured, Drift, proposed scores, pull requests (Open PRs, Merged) and tool names are explained in the Start here dialog; the 4 screens each get a one-line description (also the title of the rail link). Pull request figures and tool names in request titles are labelled sample data. Names such as Slack in request titles are sample text, not a connection.
-**Why:** the first-visit simulation flagged these as unexplained. The buyer path ends with a "Next step" line only when there is a real contact: while `CONTACT_PLACEHOLDER` is still a bracketed placeholder, `buyerNextStep()` returns nothing and the line is omitted on the landing page and in Start here. Replace the constant with a real link to show it.
+**Why:** the first-visit simulation flagged these as unexplained. The buyer path ends with a "Next step" line, now a link (decision 14).
 
 ## 12. The Live figures on Board and Shipped agree (2026-11-17)
 
@@ -77,3 +77,9 @@ Superseded in part (2026-11-17): team colours were later replaced by a glyph on 
 
 **Decision:** `--ink-3` is now #60606A and `--ink-4` #666670 (were #71717A and #A1A1AA), so every grey text token holds 4.5:1 on the page, panel, rail and row grounds; `tests/simfix.test.ts` ("text contrast") measures it. The toast's muted icon keeps the old light grey as `--toast-mute`. Route fade-ins are 120 ms. The Score column now sits right after Stage, so it stays on screen when the table scrolls sideways; the radio inputs of the Impact and Confidence chips fill their whole chip.
 **Why:** the old light grey measured about 2.5:1; Score was off screen at about 800 px; the radios measured 13 by 13 px.
+
+## 14. A real contact link, a value line on the first screen, a useful empty Queue (2026-11-17)
+
+**Decision:** the buyer's Next step is `mailto:bryan@leandrive.io?subject=GTM%20Backlog%20demo` with the text "Write to Bryan about your own data", on the landing page and in Start here (it replaces the hidden placeholder from decision 11). A mailto link carries no `target` or `rel`, which are for http links only. The Queue, the first screen after sign-in, shows the one-sentence value line under its heading in a quiet tone. An empty Queue (all teams, or one team's filter such as Marketing) says what lands there and offers Open Triage and, with a filter, All teams.
+**Rejected:** the value line only in Start here (the persona re-test landed on a dense table with no purpose); a bare "No open requests." with no next step.
+**Why:** the persona re-test found no way to reach Bryan, no stated purpose on the first screen, and a dead end on the Marketing filter. Tests pin the exact mailto string (the old placeholder tests were replaced, not loosened: the thing they guarded, no invented address, is now guarded by the exact-match pin).

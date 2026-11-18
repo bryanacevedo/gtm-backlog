@@ -3,9 +3,9 @@
 
 import { SILENT_AFTER_DAYS } from "./domain.ts";
 
-/** A placeholder, not a real address. While it is still in this form the Next step line is not shown anywhere
-    (see buyerNextStep): put the real link here and the line appears on the landing page and in Start here. */
-export const CONTACT_PLACEHOLDER = "[contact link: to be added]";
+/** The buyer's contact: Bryan's address with a subject line, as a mailto link. */
+export const CONTACT_HREF = "mailto:bryan@leandrive.io?subject=GTM%20Backlog%20demo";
+export const CONTACT_LINK_TEXT = "Write to Bryan about your own data";
 
 /** Edits last until the demo restarts: it reloads the sample on every start (a deploy, or waking after idle) and nightly at 06:00 UTC. */
 /** The same notice, short enough for one line on a phone. */
@@ -63,9 +63,12 @@ export const BUYER_PATH: readonly string[] = [
   "Shipped: results are logged after release, and a release with none is flagged Silent.",
 ];
 
-export const BUYER_NEXT_STEP = `To run this on your own requests, contact us at ${CONTACT_PLACEHOLDER}.`;
+/** The Next step line: a lead-in and the link. Shown on the landing page and in Start here. */
+export const BUYER_NEXT_STEP = { lead: "To run this on your own requests:", href: CONTACT_HREF, text: CONTACT_LINK_TEXT } as const;
 
-/** The Next step line, or null while the contact is still the placeholder (no placeholder text is ever shown to a visitor). */
-export function buyerNextStep(contact: string = CONTACT_PLACEHOLDER): string | null {
-  return /^\[.*\]$/.test(contact) ? null : `To run this on your own requests, contact us at ${contact}.`;
+/** The empty Queue (all teams, or one team's filter): what goes here and what to do next. */
+export function queueEmptyWords(team: string | null): { text: string; hint: string } {
+  return team
+    ? { text: `No open requests from ${team}.`, hint: `A request lands here once someone accepts it in Triage and it has a score. ${team} has none open now; pick All teams to see the rest, or open Triage to decide on waiting requests.` }
+    : { text: "No open requests.", hint: "A request lands here once someone accepts it in Triage, ranked by score. Open Triage to decide on the ones waiting." };
 }

@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 import { columnSums } from "../src/app/board-logic";
 import { isSilent, SILENT_AFTER_DAYS, type Item, type ShipLogEntry } from "../src/shared/domain";
 import { changedFields, scoresUpdatedLine } from "../src/shared/scores-updated";
-import { BUYER_NEXT_STEP, BUYER_PATH, CONTACT_PLACEHOLDER, DEMO_NOTICE, DEMO_NOTICE_SHORT, DEMO_SAVE_LINE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, WORDS, buyerNextStep, wordsFor } from "../src/shared/words";
+import { BUYER_NEXT_STEP, BUYER_PATH, CONTACT_HREF, CONTACT_LINK_TEXT, DEMO_NOTICE, DEMO_NOTICE_SHORT, DEMO_SAVE_LINE, HIRING_PATH, VALUE_LINE, VIEW_WORDS, WORDS, queueEmptyWords, wordsFor } from "../src/shared/words";
 import { signinPathsHtml } from "../src/server/signin-queue";
 import { renderSignin } from "../src/server/auth";
 
-const all = [VALUE_LINE, DEMO_NOTICE, BUYER_NEXT_STEP, ...HIRING_PATH, ...BUYER_PATH, ...VIEW_WORDS.flatMap((v) => [v.name, v.line]), ...WORDS.flatMap((w) => [w.term, w.line])];
+const all = [VALUE_LINE, DEMO_NOTICE, BUYER_NEXT_STEP.lead, BUYER_NEXT_STEP.text, ...HIRING_PATH, ...BUYER_PATH, ...VIEW_WORDS.flatMap((v) => [v.name, v.line]), ...WORDS.flatMap((w) => [w.term, w.line])];
 
 describe("the vocabulary", () => {
   it("explains every term the simulation flagged, and the four screens", () => {
@@ -20,10 +20,12 @@ describe("the vocabulary", () => {
     expect(WORDS.find((w) => w.term === "Score")!.line).toContain("Impact × reach × confidence ÷ effort");
     expect(WORDS.find((w) => w.term === "Silent")!.line).toContain(`${SILENT_AFTER_DAYS} days`);
   });
-  it("has no em dashes, and the buyer's next step carries a placeholder, not an invented address", () => {
+  it("has no em dashes, and the buyer's next step is the exact mailto Bryan chose", () => {
     for (const t of all) expect(t, t).not.toContain("—");
-    expect(BUYER_NEXT_STEP).toContain(CONTACT_PLACEHOLDER);
-    expect(BUYER_NEXT_STEP).not.toMatch(/https?:|@\w+\.\w+/);
+    // Pinned exactly: a changed address or subject must fail here. Replaces the old placeholder check, which no longer applies.
+    expect(CONTACT_HREF).toBe("mailto:bryan@leandrive.io?subject=GTM%20Backlog%20demo");
+    expect(CONTACT_LINK_TEXT).toBe("Write to Bryan about your own data");
+    expect(BUYER_NEXT_STEP.href).toBe(CONTACT_HREF);
   });
   it("tells the truth about the public demo: edits are kept, then reset", () => {
     expect(DEMO_NOTICE).toContain("invented data");
@@ -33,9 +35,15 @@ describe("the vocabulary", () => {
     expect(DEMO_SAVE_LINE).toContain("until the demo restarts");
     expect(`${DEMO_NOTICE} ${DEMO_SAVE_LINE}`).not.toMatch(/kept until/);
   });
-  it("hides the Next step line while the contact is a placeholder, and shows it for a real one", () => {
-    expect(buyerNextStep()).toBeNull();
-    expect(buyerNextStep("hello@example.com")).toBe("To run this on your own requests, contact us at hello@example.com.");
+  it("says what goes in an empty Queue and what to do next, for all teams and for one", () => {
+    const one = queueEmptyWords("Marketing");
+    expect(one.text).toBe("No open requests from Marketing.");
+    expect(one.hint).toContain("Triage");
+    expect(one.hint).toContain("All teams");
+    const all = queueEmptyWords(null);
+    expect(all.text).toBe("No open requests.");
+    expect(all.hint).toContain("accepts it in Triage");
+    for (const t of [one.hint, all.hint]) expect(t).not.toContain("—");
   });
   it("keeps demo-only wording out of the real space's glossary", () => {
     const real = wordsFor(false);
@@ -55,9 +63,12 @@ describe("the landing page paths", () => {
     expect(html).toContain("invented data");
     expect(html).toContain("If you are hiring");
     expect(html).toContain("If you are buying");
-    expect(html).not.toContain("Next step:");
-    expect(html).not.toContain(CONTACT_PLACEHOLDER.replace(/[<>&]/g, ""));
+    expect(html).not.toContain("[contact link");
     expect((html.match(/<li>/g) ?? []).length).toBe(HIRING_PATH.length + BUYER_PATH.length);
+  });
+  it("links the buyer's next step with the exact mailto, and no target or rel (only http links get those)", () => {
+    expect(html).toContain('<a href="mailto:bryan@leandrive.io?subject=GTM%20Backlog%20demo">Write to Bryan about your own data</a>');
+    expect(html).not.toMatch(/mailto:[^>]*(target|rel)=/);
   });
   it("lands in the page where the template has its marker", () => {
     expect(renderSignin("a<!--paths-->b", undefined, { paths: "X" })).toBe("aXb");
