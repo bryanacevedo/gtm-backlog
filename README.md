@@ -47,7 +47,7 @@ DATABASE_URL=postgresql://… WRITE_KEY=choose-a-secret npm start
 
 Migrations apply on start. Your database starts empty. `SEED_SAMPLE=1` loads the sample backlog into it and then reloads it every night at 06:00 UTC, replacing everything in the database, so use it only on a database meant for the demo. With `WRITE_KEY` set, changes need that key, so leave it unset only on a private network.
 
-**One link with two spaces** (the live site runs this on Cloudflare Workers, below; `render.yaml` runs the same thing on Render): `node src/server/node.ts --hosted` serves it on Node. `render.yaml` runs `node src/server/node.ts --hosted` (health check `/api/health`). Everyone who is not signed in sees the demo's own ranked Queue (read from the sample data) with two buttons:
+**One link with two spaces** (the live site runs this on Cloudflare Workers, below; `render.yaml` describes the same thing for Render, retired 2026-11-18): `node src/server/node.ts --hosted` serves it on Node. `render.yaml` runs `node src/server/node.ts --hosted` (health check `/api/health`). Everyone who is not signed in sees the demo's own ranked Queue (read from the sample data) with two buttons:
 
 - **Open the demo** opens the sample backlog (PGlite, inside the instance). Anyone can use it, edits stay in it, and it reloads every night at 06:00 UTC and on every start, so a sleeping free service wakes up fresh.
 - **Sign in with Google** opens the real backlog (Postgres at `DATABASE_URL`) for allowlisted accounts. No sample is ever loaded into it. A signed-in user can switch to the demo and back from the left rail.
