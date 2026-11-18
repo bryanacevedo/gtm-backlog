@@ -98,6 +98,17 @@ export function sampleQueue(nowMs: number = Date.now()): { rows: SampleQueueRow[
   };
 }
 
+/* Sample checks: verdicts written to an item's history ("<Check>: pass" or "fail"), shown on its card as the latest check. */
+const SAMPLE_CHECKS: Record<string, { daysAgo: number; actor: string; detail: string }[]> = {
+  "CRM duplicate merge job": [
+    { daysAgo: 2, actor: "Sam Ortiz", detail: "Code review: fail. Merged accounts kept the old owner on open opportunities." },
+    { daysAgo: 1, actor: "Sam Ortiz", detail: "Code review: pass. Owner reassignment covered by tests." },
+  ],
+  "Event attendee list to sequences": [{ daysAgo: 1, actor: "Priya Raman", detail: "Dry run: fail. 14 attendees had no email and stopped the import." }],
+  "Reply classification for outbound": [{ daysAgo: 5, actor: "Sam Ortiz", detail: "Smoke test: pass. 200 recent replies sorted as the reps sorted them." }],
+  "Demo request routing": [{ daysAgo: 9, actor: "Sam Ortiz", detail: "Smoke test: pass. Test requests reached the right rep within a minute." }],
+};
+
 export function seedSql(nowMs: number = Date.now()): string {
   const now = nowMs;
   const iso = (daysAgo: number, hour = 10) => new Date(now - daysAgo * 86_400_000).toISOString().slice(0, 10) + `T${String(hour).padStart(2, "0")}:00:00.000Z`;
@@ -139,6 +150,7 @@ export function seedSql(nowMs: number = Date.now()): string {
       if (w.kind === "pr") Object.assign(meta, { repo: w.url.split("/").slice(3, 5).join("/"), number: w.number, draft: w.draft === true });
       out.push(`INSERT INTO work_links (id,item_id,kind,url,title,state,meta,created_at,created_by) VALUES (${[`wl_${++wl}`, id(i), w.kind, w.url, w.title, w.state ?? null, JSON.stringify(meta), iso(w.daysAgo, 12), r.owner ?? "Sam Ortiz"].map(q).join(", ")});`);
     }
+    for (const c of SAMPLE_CHECKS[r.title] ?? []) addEvent(id(i), c.daysAgo, c.actor, "logged", c.detail);
     for (const l of r.log ?? []) {
       out.push(`INSERT INTO ship_log VALUES (${[`sl_${++lg}`, id(i), day(l.daysAgo), l.metric, l.value, l.unit, l.note ?? null, r.system ?? null, iso(l.daysAgo, 17)].map(q).join(", ")});`);
       addEvent(id(i), l.daysAgo, r.owner ?? "Sam Ortiz", "logged", `Logged ${l.metric}: ${l.value}${l.unit === "%" ? "%" : ` ${l.unit}`}`);

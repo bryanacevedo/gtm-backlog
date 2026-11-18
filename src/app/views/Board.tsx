@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, u
 import { createPortal, flushSync } from "react-dom";
 import { FLOW, SILENT_AFTER_DAYS, isSilent, label, score, type Item, type ShipLogEntry, type Stage } from "../../shared/domain";
 import type { Shared } from "../App";
+import { latestChecks, type Check } from "../../shared/checks";
 import { columnsOf, columnSums, movedTo, nearestStage, pullRequests, slotIndex, stageStep } from "../board-logic";
 import { planMove } from "../forms";
 import { agoShort, fmtNum, fmtScore, isTyping, linkClick, navigate, useQueryParam } from "../lib";
@@ -221,8 +222,9 @@ export function Board({ shared }: { shared: Shared }) {
   const dragItem = drag ? data.items.find((i) => i.id === drag.id) : null;
   const total = FLOW.reduce((n, s) => n + cols[s].length, 0);
 
+  const checks = useMemo(() => latestChecks(data.events), [data.events]);
   const cardProps = (item: Item) => ({
-    item, now, latest: latest.get(item.id), silent: isSilent(item, logsOf(item.id), now), prs: pullRequests(data.workLinks, item.id),
+    item, now, check: checks.get(item.id), latest: latest.get(item.id), silent: isSilent(item, logsOf(item.id), now), prs: pullRequests(data.workLinks, item.id),
     onStage: (to: Stage) => tryMove(item.id, to, "phone"),
   });
 
@@ -297,14 +299,14 @@ const days = (iso: string, now: Date) => {
 const Cell = ({ k, children, cls, title }: { k: string; children: React.ReactNode; cls?: string; title?: string }) => <span className={`cell${cls ? " " + cls : ""}`} title={title}><span className="k">{k}</span><span className="v">{children}</span></span>;
 
 interface CardProps {
-  item: Item; now: Date; latest?: ShipLogEntry; silent: boolean; prs: { open: number; merged: number; total: number };
+  item: Item; now: Date; latest?: ShipLogEntry; check?: Check; silent: boolean; prs: { open: number; merged: number; total: number };
   focused?: boolean; flashed?: boolean; slot?: boolean; ghost?: boolean; lift?: string; style?: React.CSSProperties;
   onFocus?: () => void; onPointerDown?: (e: React.PointerEvent<HTMLElement>) => void; onStage?: (to: Stage) => void; suppress: React.MutableRefObject<boolean>;
 }
 
 /* Three or four earned lines, each figure under its label in a strip below one hairline: Score and Waiting in Idea; Score, Open PRs, Merged and In build in Building;
    the latest result, Logging when silent, and days live in Live. Pull request counts come from the work links and are left out when a build has none. */
-const Card = forwardRef<HTMLElement, CardProps>(function Card({ item, now, latest, silent, prs, focused, flashed, slot, ghost, lift, style, onFocus, onPointerDown, onStage, suppress }, ref) {
+const Card = forwardRef<HTMLElement, CardProps>(function Card({ item, now, latest, check, silent, prs, focused, flashed, slot, ghost, lift, style, onFocus, onPointerDown, onStage, suppress }, ref) {
   const sample = useStore((s) => (s.data?.meta.demo ? " Sample data." : ""));
   const s = score(item);
   const href = `/item/${item.id}`;
@@ -345,6 +347,13 @@ const Card = forwardRef<HTMLElement, CardProps>(function Card({ item, now, lates
           </label>
         )}
       </div>
+      {check && (
+        <div className="chk" title={check.detail}>
+          <span className="k">Last check</span>
+          <span className="v"><span className="n">{check.name}:</span><span className={check.verdict === "fail" ? "w strong" : "w"}>{check.verdict}</span></span>
+          <span className="d">{days(check.at, now)}</span>
+        </div>
+      )}
     </article>
   );
 });

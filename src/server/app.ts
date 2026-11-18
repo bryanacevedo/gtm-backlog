@@ -14,6 +14,7 @@ import {
 import { DEFAULT_ACCENT, accentError, checkPhoto, checkSetting, normalizeHex, SETTING_KEYS, type SettingKey, type Settings } from "../shared/settings.ts";
 import { DEFAULT_MODEL, PROMPT_VERSION, PROPOSAL_COLS, loadExamples, makeClient, proposeWithClaude, saveProposal, standIn, type ScoringClient } from "./scoring.ts";
 import type { Proposal } from "../shared/scoring.ts";
+import { CHECK_SQL } from "../shared/checks.ts";
 import { kindWord, parseWorkLink, readPullRequest, type WorkLink } from "../shared/work.ts";
 
 /** Which data space a request reaches, decided by the caller's credentials and nothing the request names. */
@@ -191,7 +192,11 @@ export function createApp(getDb: () => Db | Promise<Db>, cfg: AppConfig) {
     const [items, shipLog, events, workLinks, settings, photos] = await Promise.all([
       q<Item>(`SELECT ${ITEM_COLS} FROM items`),
       q<ShipLogEntry>(`SELECT ${LOG_COLS} FROM ship_log ORDER BY date DESC, created_at DESC`),
-      q<EventRow>("SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400"),
+      // The latest 400 events, plus each item's latest check however old (a card shows it; src/shared/checks.ts).
+      q<EventRow>(`SELECT id, item_id, at, actor, kind, detail FROM (SELECT id, item_id, at, actor, kind, detail FROM events ORDER BY at DESC LIMIT 400) recent
+        UNION SELECT id, item_id, at, actor, kind, detail FROM (SELECT DISTINCT ON (item_id) id, item_id, at, actor, kind, detail FROM events
+          WHERE kind = 'logged' AND item_id IS NOT NULL AND detail ~* $1 ORDER BY item_id, at DESC) checks
+        ORDER BY at DESC`, [CHECK_SQL]),
       q<WorkLink>(`SELECT ${WORK_COLS} FROM work_links ORDER BY created_at DESC`),
       readSettings(db, rows),
       readPhotos(db, rows),

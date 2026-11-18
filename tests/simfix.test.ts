@@ -27,13 +27,12 @@ describe("the vocabulary", () => {
     expect(CONTACT_LINK_TEXT).toBe("Write to Bryan about your own data");
     expect(BUYER_NEXT_STEP.href).toBe(CONTACT_HREF);
   });
-  it("tells the truth about the public demo: edits are kept, then reset", () => {
+  it("tells the truth about the public demo: edits are shared, then reset every night (the Worker has no restart)", () => {
     expect(DEMO_NOTICE).toContain("invented data");
-    expect(DEMO_NOTICE).toContain("until the demo restarts");
-    expect(DEMO_NOTICE).toContain("on every start");
-    expect(DEMO_NOTICE).toContain("06:00 UTC");
-    expect(DEMO_SAVE_LINE).toContain("until the demo restarts");
-    expect(`${DEMO_NOTICE} ${DEMO_SAVE_LINE}`).not.toMatch(/kept until/);
+    expect(DEMO_NOTICE).toContain("every night at 06:00 UTC");
+    expect(DEMO_SAVE_LINE).toContain("06:00 UTC");
+    expect(DEMO_NOTICE_SHORT).toContain("nightly reset");
+    expect(`${DEMO_NOTICE} ${DEMO_SAVE_LINE} ${DEMO_NOTICE_SHORT}`).not.toMatch(/restart|every start|kept until/);
   });
   it("says what goes in an empty Queue and what to do next, for all teams and for one", () => {
     const one = queueEmptyWords("Marketing");
@@ -127,7 +126,7 @@ describe("the demo bar on a phone", () => {
   const css = readFileSync(new URL("../src/app/styles.css", import.meta.url), "utf8");
   it("swaps the long notice for a one-line one so the bar stays within two lines at 390 px", () => {
     expect(DEMO_NOTICE_SHORT.length).toBeLessThanOrEqual(55);
-    expect(DEMO_NOTICE_SHORT).toContain("until the demo restarts");
+    expect(DEMO_NOTICE_SHORT).toContain("until the nightly reset");
     expect(DEMO_NOTICE_SHORT).not.toContain("\u2014");
     expect(css).toMatch(/\.demo-short\s*\{\s*display:\s*none/);
     expect(css).toMatch(/@media \(max-width: 760px\)\s*\{[^}]*\.demo-bar[\s\S]*?\.demo-long\s*\{\s*display:\s*none[\s\S]*?\.demo-short\s*\{\s*display:\s*block/);

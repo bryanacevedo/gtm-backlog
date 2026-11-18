@@ -414,6 +414,15 @@ table.grid { width: 100%; border-collapse: collapse; font: var(--t-data); }
 .card .cell.word .v { font-family: var(--sans); font-weight: 400; }
 .card .cell.strong .v { font-weight: 600; }
 .card .cell.pale .v, .card .cell.pale .v .u { color: var(--ink-4); }
+/* The latest check (a review or test verdict from the item's history): one quiet line, the verdict a plain word, a failure in semibold ink. */
+.card .chk { gap: 8px; font: var(--t-meta); color: var(--ink-3); }
+.card .chk .k { flex: none; }
+.card .chk .v { display: flex; gap: 4px; min-width: 0; color: var(--ink-2); white-space: nowrap; }
+.card .chk .v .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; } /* the name gives way, the verdict never does */
+.card .chk .v .w { flex: none; }
+.card .chk .v .strong { color: var(--ink-1); font-weight: 600; }
+.card .chk .d { margin-left: auto; flex: none; font-family: var(--mono); }
+.card .chk .d .u { font-family: var(--sans); }
 
 /* Where it will land: a slot the size of the card it will become, tinted with the interaction colour. */
 .card.is-slot { background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent); transform: none; }

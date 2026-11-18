@@ -4,9 +4,9 @@
 
 **The backlog for a GTM engineering team.** Requests land in one inbox, get ranked by what they're worth to revenue, move from idea to live, and keep reporting what they did after they ship.
 
-**Live demo:** https://gtm-backlog.onrender.com (sample company with invented data, editable, reloads on every restart and nightly; the free plan sleeps when idle, so the first visit can take a minute)
+**Live demo:** https://gtm-backlog.leandrive.workers.dev (sample company with invented data, editable, reloads every night at 06:00 UTC)
 
-[![Watch the 66-second walkthrough](docs/screens/video-poster.jpg)](https://gtm-backlog.onrender.com/video/gtm-backlog.mp4)
+[![Watch the 66-second walkthrough](docs/screens/video-poster.jpg)](https://gtm-backlog.leandrive.workers.dev/video/gtm-backlog.mp4)
 
 ![Triage: requests on the left, the decision on the right, and a live preview of where the request lands in the queue](docs/screens/triage.png)
 
@@ -18,7 +18,7 @@ Sales, marketing, partnerships and RevOps all ask GTM engineering for "a quick a
 
 - **Triage is an inbox.** Each request arrives with who asked and why. You set four inputs and watch where it would land in the queue before you accept, merge or decline it. Declines need a reason the requester can read.
 - **The Queue ranks by value per day of work:** impact × reach × (confidence ÷ 100) ÷ effort. Every input has its own column, and a score nobody has confirmed in 60 days fades and says so.
-- **The Board moves work from idea to building to live.** Nothing goes live without a link to the running system.
+- **The Board moves work from idea to building to live.** Nothing goes live without a link to the running system. A card shows its latest check, a review or test verdict written to its history as "<Check>: pass" or "<Check>: fail".
 - **Shipped is the leadership changelog.** It groups work by month and shows each system's latest measured result. A live system with no result for 30 days is flagged as silent.
 
 | | |
@@ -47,7 +47,7 @@ DATABASE_URL=postgresql://… WRITE_KEY=choose-a-secret npm start
 
 Migrations apply on start. Your database starts empty. `SEED_SAMPLE=1` loads the sample backlog into it and then reloads it every night at 06:00 UTC, replacing everything in the database, so use it only on a database meant for the demo. With `WRITE_KEY` set, changes need that key, so leave it unset only on a private network.
 
-**Deploy to Render, one link with two spaces:** `render.yaml` runs `node src/server/node.ts --hosted` (health check `/api/health`). Everyone who is not signed in sees the demo's own ranked Queue (read from the sample data) with two buttons:
+**One link with two spaces** (the live site runs this on Cloudflare Workers, below; `render.yaml` runs the same thing on Render): `node src/server/node.ts --hosted` serves it on Node. `render.yaml` runs `node src/server/node.ts --hosted` (health check `/api/health`). Everyone who is not signed in sees the demo's own ranked Queue (read from the sample data) with two buttons:
 
 - **Open the demo** opens the sample backlog (PGlite, inside the instance). Anyone can use it, edits stay in it, and it reloads every night at 06:00 UTC and on every start, so a sleeping free service wakes up fresh.
 - **Sign in with Google** opens the real backlog (Postgres at `DATABASE_URL`) for allowlisted accounts. No sample is ever loaded into it. A signed-in user can switch to the demo and back from the left rail.
@@ -64,7 +64,7 @@ With `DATABASE_URL` or the Google settings missing, the app runs demo-only and o
 | `GOOGLE_CLIENT_ID` | sign-in | OAuth client ID of a Google Cloud "Web application" client. |
 | `GOOGLE_CLIENT_SECRET` | sign-in | That client's secret. |
 | `SESSION_SECRET` | sign-in | At least 32 random characters (`openssl rand -base64 48`). Signs the session cookie. Changing it signs everyone out. |
-| `PUBLIC_URL` | sign-in | The site's address with no path, for example `https://gtm-backlog.onrender.com`. The redirect URI is `${PUBLIC_URL}/auth/google/callback`. It must be `https`, except for localhost. |
+| `PUBLIC_URL` | sign-in | The site's address with no path, for example `https://gtm-backlog.leandrive.workers.dev`. The redirect URI is `${PUBLIC_URL}/auth/google/callback`. It must be `https`, except for localhost. |
 | `ALLOWED_EMAILS` | sign-in | Comma list of Google addresses that may enter, for example `me@example.com,ana@example.com`. Case-insensitive. |
 | `ALLOWED_DOMAIN` | sign-in | A domain whose every address may enter, for example `example.com` (exact match: subdomains and look-alikes do not count). The account must also be a Google Workspace account of that domain (Google's `hd` claim), so a personal Google account that once used a work address does not count. Use it alone or together with `ALLOWED_EMAILS` (the way in for addresses outside Workspace); at least one of the two is required. |
 | `WRITE_KEY` | scripts | Optional. A request with the header `x-write-key: <key>` and an `x-actor` name reaches the real space without a browser session. A wrong key is refused, never sent to the demo. |
@@ -78,14 +78,23 @@ Sign-in turns on only when `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SE
 **Set up Google sign-in.** In Google Cloud Console, create an OAuth client of type "Web application" (APIs and Services, Credentials) and add this under Authorized redirect URIs. For the live site that is exactly:
 
 ```
-https://gtm-backlog.onrender.com/auth/google/callback
+https://gtm-backlog.leandrive.workers.dev/auth/google/callback
 ```
 
 Add `http://localhost:8921/auth/google/callback` as well to try it locally with `PUBLIC_URL=http://localhost:8921`. The scopes are `openid email profile`. The server uses the authorization code flow with PKCE (S256), `state` and `nonce`, and accepts an ID token only if its RS256 signature matches Google's published keys and its issuer, audience, expiry and nonce check out and the email is verified. Then the address must be on the allowlist, and is checked again on every request, so removing one from `ALLOWED_EMAILS` locks that person out as soon as the server restarts with the new list.
 
 The session is a signed cookie (`__Host-bl_session`; `bl_session` on plain-http localhost): httpOnly, `SameSite=Lax`, `Secure` on https, valid for 7 days, ended by Sign out in that browser. It is stateless: a copied cookie stays valid until it expires, so to end every session at once, change `SESSION_SECRET`, and to lock out one person, remove them from the allowlist. Changes made from a browser in the real space are logged under the Google name, not under whatever the browser sends. Script changes made with `WRITE_KEY` are logged as `script: <x-actor>`.
 
-**Cloudflare Workers (older path, not running anywhere):** the repo still has a Worker entry point (`src/server/worker.ts`, `wrangler.toml`, `npm run deploy`). It serves the demo only, with no sign-in, against Postgres at `DATABASE_URL`, and its nightly cron reloads the sample into that database, so point it only at a database meant for the demo. It does not run migrations: run `DATABASE_URL=… npm run migrate` first. The live site runs on Render.
+**Deploy to Cloudflare Workers (the live site, since 2026-11-18):** `src/server/worker.ts` serves the same two spaces as `--hosted`, through the same `createHosted` code, with Postgres for both: the demo at `DEMO_DATABASE_URL` and the real backlog at `DATABASE_URL`. They must be different databases (the Worker refuses to serve or reset when they match). The live site keeps both in one Supabase database: the real backlog in `public`, the demo in a `demo` schema reached through its own role, `backlog_demo`, whose search path is `demo` and which has no rights on `public`, so the nightly reset cannot reach the real tables. Every page goes through the Worker first (the sign-in check), built files under `/assets` come straight from the asset store, and each request opens up to 5 pooled connections per space and closes them after. The cron at 06:00 UTC applies migrations to both databases (they are bundled from `src/server/migrations-bundle.ts`; add each new migration there, a test checks it), reloads the sample into the demo, and reads the real database once so a free Supabase project never pauses.
+
+```bash
+npx wrangler secret put DEMO_DATABASE_URL     # and DATABASE_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+                                              # SESSION_SECRET, ALLOWED_EMAILS, WRITE_KEY, ANTHROPIC_API_KEY
+DATABASE_URL=… npm run migrate                # each database once, before the first deploy
+npm run deploy                                # vite build, then wrangler deploy
+```
+
+`PUBLIC_URL` is a plain variable in `wrangler.toml`. Edits in the demo are shared by visitors and last until the nightly reset.
 
 **Checks:** `make test` runs the unit tests, the database tests (real Postgres via PGlite) and the typecheck. `node scripts/audit-layout.mjs` checks alignment in a real browser against the running demo (`make demo` first; set `CHROME` to your Chrome binary outside macOS).
 
@@ -114,7 +123,7 @@ flowchart LR
 | API | Hono, one transaction per write, every write logged as an event | The activity feed doubles as the audit trail. Moves lock the row, so two people can't both win a race. |
 | Database | Postgres 15+ | Stage enum; `CHECK` constraints for "live needs a system link", "declined or retired needs a reason", no self-merge and every input range. The rules hold even if someone skips the API. A generated `score` column and a ranked `queue` view mirror the app's math for reporting, and a test proves they match. |
 | Local | PGlite (Postgres compiled to WebAssembly) | `make demo` works on any machine with Node and nothing else. |
-| Hosted | Render (Node: PGlite for the demo, Postgres for the real space) | The same Hono app as local. Render serves both spaces behind Google sign-in; a nightly timer reloads the demo. |
+| Hosted | Cloudflare Workers plus Supabase Postgres (demo and real space in separate schemas and roles) | The same Hono app as local. The Worker serves both spaces behind Google sign-in; its cron reloads the demo each night. Render (`render.yaml`, PGlite demo) runs the same app on Node. |
 | UI | React + Vite, no component library | Small, fast, and every component built for this product. |
 
 More detail: [docs/SPEC.md](docs/SPEC.md) for the product, and [docs/DECISIONS.md](docs/DECISIONS.md) for the trade-offs.

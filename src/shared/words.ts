@@ -7,11 +7,11 @@ import { SILENT_AFTER_DAYS } from "./domain.ts";
 export const CONTACT_HREF = "mailto:bryan@leandrive.io?subject=GTM%20Backlog%20demo";
 export const CONTACT_LINK_TEXT = "Write to Bryan about your own data";
 
-/** Edits last until the demo restarts: it reloads the sample on every start (a deploy, or waking after idle) and nightly at 06:00 UTC. */
+/** On the Cloudflare Worker the demo is a database the cron reloads every night at 06:00 UTC, so edits last until then. */
 /** The same notice, short enough for one line on a phone. */
-export const DEMO_NOTICE_SHORT = "Invented data. Edits last until the demo restarts.";
-export const DEMO_NOTICE = "Sample company with invented data. Edits are shared with other visitors and last until the demo restarts. It reloads the sample on every start and every night at 06:00 UTC. Dates follow today's date.";
-export const DEMO_SAVE_LINE = "Sample backlog: this change lasts until the demo restarts (it reloads on every start and nightly at 06:00 UTC).";
+export const DEMO_NOTICE_SHORT = "Invented data. Edits last until the nightly reset.";
+export const DEMO_NOTICE = "Sample company with invented data. Edits are shared with other visitors and last until the sample reloads every night at 06:00 UTC. Dates follow today's date.";
+export const DEMO_SAVE_LINE = "Sample backlog: this change lasts until the sample reloads at 06:00 UTC.";
 
 export const VALUE_LINE = "GTM engineering requests, ranked by what they are worth to revenue, from idea to live, with results after they ship.";
 
