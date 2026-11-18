@@ -29,4 +29,8 @@ describe("the Worker", () => {
     expect(night).toMatch(/demo\.exec\(seedSql\(\)\)/);
     expect(night).not.toMatch(/real\.exec/);
   });
+  it("hands the app a wrapped fetch, so Google sign-in works on Workers (a bare fetch throws Illegal invocation)", () => {
+    const src = readFileSync(new URL("../src/server/worker.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/fetch: \(input, init\) => fetch\(input, init\)/);
+  });
 });

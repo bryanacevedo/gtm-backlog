@@ -91,6 +91,9 @@ export default {
       demoDb, realDb, auth,
       writeKey: env.WRITE_KEY || undefined, accent: env.ACCENT || undefined, githubToken: env.GITHUB_TOKEN || undefined,
       anthropicKey: env.ANTHROPIC_API_KEY || undefined,
+      // Workers throw "Illegal invocation" when the global fetch is called as a method of another object (deps.fetch(...)),
+      // which is how sign-in and the GitHub lookups call it. A wrapper keeps `this` right.
+      fetch: (input, init) => fetch(input, init),
       signinHtml: api ? FALLBACK_SIGNIN : await signinHtml(env, url),
     });
     try {
