@@ -4,7 +4,7 @@ import { allMigrations } from "./migrations";
 import { createApp } from "../src/server/app";
 import { migrate, pglite, type Db } from "../src/server/db";
 import { seedSql } from "../src/server/seed";
-import { latestChecks, parseCheck } from "../src/shared/checks";
+import { CHECK_SQL, latestChecks, parseCheck } from "../src/shared/checks";
 import type { EventRow } from "../src/shared/domain";
 
 const ev = (id: string, item: string | null, at: string, detail: string, kind: EventRow["kind"] = "logged"): EventRow => ({ id, item_id: item, at, actor: "a", kind, detail });
@@ -43,6 +43,15 @@ describe("/api/state", () => {
   let db: Db;
   beforeAll(async () => { db = await pglite(); await migrate(db, allMigrations()); await db.exec(seedSql()); });
   afterAll(() => db.close());
+
+  it("matches in Postgres exactly what the app matches", async () => {
+    const cases = ["Goldfish: pass, 2026-11-18", "Code review: FAILED. Two findings.", "Smoke test: blocked", "Smoke test:pass", "Goldfish: pass; Live note matches RESULTS",
+      "Logged Replies sorted: 200 replies", "Live: passed to the team", "Goldfish: passive review", "Idea → Building", "Review pass", ": pass", "A very long name that is far past thirty-one characters: pass"];
+    for (const d of cases) {
+      const [{ m }] = await db.query<{ m: boolean }>("SELECT $1 ~* $2 AS m", [d, CHECK_SQL]);
+      expect(m, d).toBe(parseCheck(ev("1", "x", "t", d)) !== null);
+    }
+  });
 
   it("sends every item's latest check even when it is older than the latest 400 events", async () => {
     await db.query("INSERT INTO events (id, item_id, at, actor, kind, detail) VALUES ('ev_old', 'bl_005', now() - interval '400 days', 'a', 'logged', 'Data check: pass. Old.')");

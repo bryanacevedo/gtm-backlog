@@ -22,7 +22,7 @@ describe("the Worker", () => {
     expect(sameDatabase("postgres://demo/b", "postgres://real/b")).toBe(false);
     expect(sameDatabase("postgres://demo/b", undefined)).toBe(false);
   });
-  it("migrates and seeds only the demo database at night", () => {
+  it("seeds only the demo database at night (both are migrated)", () => {
     const src = readFileSync(new URL("../src/server/worker.ts", import.meta.url), "utf8");
     const night = src.slice(src.indexOf("async scheduled"));
     expect(night.match(/seedSql\(\)/g)?.length).toBe(1);
